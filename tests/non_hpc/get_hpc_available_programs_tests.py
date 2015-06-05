@@ -1,8 +1,8 @@
 __author__ = 'Pabitra'
 
-from hydrogate import Client
+from hydrogate import HydroDS
 
-client = Client(hpc='USU')
+client = HydroDS(hpc='USU')
 client.login(username="username for hydrogate",  password="password for hydrogate")
 
 programs_at_usu_hpc = client.get_available_programs(hpc='USU')

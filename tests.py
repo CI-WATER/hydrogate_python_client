@@ -1,11 +1,8 @@
 __author__ = 'Pabitra'
-from hydrogate import Client
+from hydrogate import HydroDS
 
-
-
-#client = Client()
 # >>>>>> tests data services
-client = Client()
+client = HydroDS()
 
 #client.get_token()
 #client.get_upload_status()

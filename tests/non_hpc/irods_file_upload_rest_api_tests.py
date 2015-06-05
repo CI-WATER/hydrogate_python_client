@@ -1,8 +1,8 @@
 __author__ = 'Pabitra'
 
-from hydrogate import Client
+from hydrogate import HydroDS
 
-client = Client()
+client = HydroDS()
 
 # login to irods
 client.login(username='username for irods rest API', password='password for irods REST API')

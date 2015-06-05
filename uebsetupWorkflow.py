@@ -1,11 +1,11 @@
-from hydrogate import Client
+from hydrogate import HydroDS
 #import watershedFunctions
 
 """
 THIS CODE IS OBSOLETE AS IT IS USING THE OLD JAVA BASED WEB SERVICES
 """
 
-client = Client()
+client = HydroDS()
 
 workingDir = "E:/Scratch/HydroGateClientDemo/"
 #get approximate watereshed boundary in geographic coordinates left, top, right, bottom

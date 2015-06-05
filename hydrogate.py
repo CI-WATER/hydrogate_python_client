@@ -9,6 +9,8 @@ import json
 import pickle
 import datetime
 
+# TODO: create a custom Exception class
+
 def singleton(cls):
     instances = {}
 
@@ -20,15 +22,15 @@ def singleton(cls):
 
 
 @singleton
-class Client(object):
+class HydroDS(object):
     def __init__(self, base_url='https://hydrogate.uwrl.usu.edu/hydrogate', username=None, password=None, hpc=None):
         self.base_url = base_url
         if self.base_url.endswith('/'):
             self.base_url = self.base_url.strip('/')
 
         self.hydrogate_base_url = 'https://129.123.41.158/hydrogate'    #http://ckan-fileserver.uwrl.usu.edu/hydrogate
-        self.dataservice_base_url = 'http://129.123.41.184:20199/api/dataservice'
-        self.irods_rest_base_url = 'http://129.123.41.184:8080/irods-rest-4.0.2.1-SNAPSHOT/rest'
+        self.dataservice_base_url = 'http://hydro-ds.uwrl.usu.edu:20199/api/dataservice'
+        self.irods_rest_base_url = 'http://hydro-ds.uwrl.usu.edu:8080/irods-rest-4.0.2.1-SNAPSHOT/rest'
         self.token_url = self.hydrogate_base_url + '/request_token/'
         self.upload_pkg_url = self.hydrogate_base_url + '/upload_package/'
         self.upload_pkg_status_url = self.hydrogate_base_url + '/retrieve_package_status'

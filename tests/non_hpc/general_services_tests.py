@@ -1,7 +1,7 @@
 __author__ = 'Pabitra'
-from hydrogate import Client
+from hydrogate import HydroDS
 
-client = Client()
+client = HydroDS()
 
 # test printing service log history all, first in first print
 client.show_service_request_history()

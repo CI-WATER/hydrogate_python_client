@@ -4,9 +4,9 @@ __author__ = 'Pabitra'
 Run this test after successfully running subset_dem test
 """
 import time
-from hydrogate import Client
+from hydrogate import HydroDS
 
-client = Client()
+client = HydroDS()
 
 
 # user needs to be authenticated to USU hpc system in order to transfer file

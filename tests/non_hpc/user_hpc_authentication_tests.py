@@ -1,7 +1,7 @@
 __author__ = 'Pabitra'
-from hydrogate import Client
+from hydrogate import HydroDS
 
-client = Client()
-client.authenticate_user(username="root",  password="CIWater$8064", hpc='USU')
+client = HydroDS()
+client.authenticate_user(username="hydrogate username",  password="hydrogate password", hpc='USU')
 
 print ">>>.DONE..."

@@ -1,12 +1,12 @@
 __author__ = 'Pabitra'
 
-from hydrogate import Client
+from hydrogate import HydroDS
 import settings
 
-client = Client(username=settings.USER_NAME, password=settings.PASSWORD)
+hds = HydroDS(username=settings.USER_NAME, password=settings.PASSWORD)
 
 try:
-    response_data = client.get_static_files_info()
+    response_data = hds.get_static_files_info()
     for static_file_item in response_data:
         for variable in static_file_item['variables']:
             print('variable name:' + variable['name'])
