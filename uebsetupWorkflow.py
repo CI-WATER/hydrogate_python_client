@@ -1,6 +1,10 @@
 from hydrogate import Client
 #import watershedFunctions
 
+"""
+THIS CODE IS OBSOLETE AS IT IS USING THE OLD JAVA BASED WEB SERVICES
+"""
+
 client = Client()
 
 workingDir = "E:/Scratch/HydroGateClientDemo/"

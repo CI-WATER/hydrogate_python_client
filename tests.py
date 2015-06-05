@@ -3,6 +3,8 @@ from hydrogate import Client
 
 
 
+#client = Client()
+# >>>>>> tests data services
 client = Client()
 
 #client.get_token()
@@ -15,13 +17,13 @@ client = Client()
 client.show_service_request_history()
 
 # print only the first 2 items
-#client.show_service_request_history(count=2)
+client.show_service_request_history(count=2)
 
 # print all items (last in print first)
-#client.show_service_request_history(order='last')
+client.show_service_request_history(order='last')
 
 # print only the last 3 items
-#client.show_service_request_history(order='last', count=3)
+client.show_service_request_history(order='last', count=3)
 #exit()
 
 # test getting a token
@@ -31,26 +33,33 @@ client.show_service_request_history()
 
 #print(client.get_token_expire_time())
 #exit()
-# test subsetting a dem
+#test subsetting a dem
 #client.subset_dem(left_top_x=170000, left_top_y=4700000, right_bottom_x=570000, right_bottom_y=4100000)
 #subset_dem_request = client.subset_dem(left=432760.510, top=4662453.522, right=461700.887, bottom=4612686.409)
-#subsetDEM_request = client.subset_dem(-112.04, 41.73, -111.5, 41.36)
+#subset_dem_request = client.subset_dem(-112.04, 41.73, -111.5, 41.36)
 
+#exit()
 
 # test downloading the subset dem
-#subset_dem_request = client.get_most_recent_request(service_name='subset_dem')
+# subset_dem_request = client.get_most_recent_request(service_name='subset_dem')
 # if subset_dem_request:
 #     # remove the '.zip' part of the url path
 #     input_raster_url = subset_dem_request.file_path
+#     # login to irods
+#     client.login(username='username for irods REST API', password='password for irods REST API')
+#     client.download_file(subset_dem_request.file_path, save_as=r'E:\Scratch\HydroGateClientDemo\nedLogan_2.tif')
 
 #exit()
 
 #     file_url_path = subset_dem_request.file_path[:len(subset_dem_request.file_path)-4]
-#     client.download_file(file_url_path, save_as=r'E:\Scratch\HydroGateClientDemo\nedLogan.tif')
+#client.download_file(file_url_path, save_as=r'E:\Scratch\HydroGateClientDemo\nedLogan.tif')
 
 # first upload the files necessary for generating watershed raster
-client.upload_file(file_to_upload=r'E:\Scratch\HydroGateClientDemo\nedLogan.tif')
-
+# login to irods
+client.login(username='username for irods REST API', password='password for irods REST API')
+client.upload_file_irods(file_to_upload=r'E:\Scratch\HydroGateClientDemo\nedLogan.tif')
+#client.upload_file(file_to_upload=r'E:\Scratch\HydroGateClientDemo\nedLogan.tif')
+exit()
 # file_upload_request = client.get_most_recent_request()
 # if file_upload_request:
 #     input_raster_url = file_upload_request.file_path
