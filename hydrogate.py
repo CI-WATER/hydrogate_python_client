@@ -900,34 +900,36 @@ class HydroDS(object):
         if not os.path.isfile(file_to_upload):
             raise Exception("Error: Specified file to upload (%s) does not exist." % file_to_upload)
 
-        url = self.dataservice_base_url + '/uploader'
+        url = self._get_dataservice_specific_url('myfiles/upload')
         #upload_file_obj = open(file_to_upload, 'rb')
         #upload_file_obj = {'file': open(file_to_upload, 'rb')}
         with open(file_to_upload, 'rb') as upload_file_obj:
-            response = self.requests.put(url, files={'file': upload_file_obj})
+            response = self._make_data_service_request(url=url, http_method='POST', files={'file': upload_file_obj})
+            #response = self.requests.put(url, files={'file': upload_file_obj})
 
+        return self._process_dataservice_response(response, save_as=None)
         # file_size = os.path.getsize(file_to_upload)
         # headers = {'content-type': 'application/octet-stream'}
         # with open(file_to_upload, 'rb') as upload_file_obj:
         #     response = self.requests.put(url, data=upload_file_obj.read(), params={'file': os.path.basename(file_to_upload)}, headers=headers)
         #response = self.requests.put(url, data=upload_file_obj, headers=headers)
 
-        if response.status_code != requests.codes.ok:
-            raise Exception("Error: HydroGate connection error.")
-
-        response_dict = json.loads(response.content)
-        if response_dict['ret'] == 'success':
-            uploaded_file_url = response_dict['url']
-            print ("File upload was successful.")
-            print("Uploaded file URL path:%s" % uploaded_file_url)
-            service_req = ServiceRequest(service_name='upload_file', service_id_name='',
-                                         service_id_value='', service_status='success', file_path=uploaded_file_url)
-            _ServiceLog.add(service_req)
-            self.save_service_call_history()
-            print(service_req.to_json())
-            return service_req
-        else:
-            self._raise_service_error(response_dict['message'])
+        # if response.status_code != requests.codes.ok:
+        #     raise Exception("Error: HydroGate connection error.")
+        #
+        # response_dict = json.loads(response.content)
+        # if response_dict['ret'] == 'success':
+        #     uploaded_file_url = response_dict['url']
+        #     print ("File upload was successful.")
+        #     print("Uploaded file URL path:%s" % uploaded_file_url)
+        #     service_req = ServiceRequest(service_name='upload_file', service_id_name='',
+        #                                  service_id_value='', service_status='success', file_path=uploaded_file_url)
+        #     _ServiceLog.add(service_req)
+        #     self.save_service_call_history()
+        #     print(service_req.to_json())
+        #     return service_req
+        # else:
+        #     self._raise_service_error(response_dict['message'])
 
     def download_file(self, file_url_path, save_as):
         self._validate_file_save_as(save_as)
@@ -981,13 +983,15 @@ class HydroDS(object):
         if len(file_name.strip()) < 4 or not file_name.endswith('.nc'):
             raise ValueError(err_msg)
 
-    def _make_data_service_request(self, url, http_method='GET', params=None, data=None):
+    def _make_data_service_request(self, url, http_method='GET', params=None, data=None, files=None):
         if http_method == 'GET':
             return self.requests.get(url, params=params, data=data, auth=self.authorization)
         elif http_method == 'DELETE':
             return self.requests.delete(url, params=params, data=data, auth=self.authorization)
+        elif http_method == 'POST':
+            return self.requests.post(url, params=params, data=data, files=files, auth=self.authorization)
         else:
-            raise Exception("Only GET and DELETE http methods are currently supported for the CIWATER Data API Service.")
+            raise Exception("%s http method is not supported for the HydroDS API." % http_method)
 
     def _get_dataservice_specific_url(self, service_name):
         return "{base_url}/{service_name}".format(base_url=self.dataservice_base_url, service_name=service_name)
