@@ -380,17 +380,18 @@ class HydroDS(object):
         response = self._make_data_service_request(url=url)
         return self._process_dataservice_response(response, save_as=None)
 
-    def subset_dem(self, left, top, right, bottom, output_raster=None, save_as=None):
+    def subset_raster(self, left, top, right, bottom, input_raster, output_raster=None, save_as=None):
         """
         Subsets a dem (dem tif file on the file server) and creates a new tif file with the subset data
         :param left: x-coordinate of the left-top corner of the bounding box
         :param top: y-coordinate of the left-top corner of the bounding box
         :param right: x-coordinate of the right-bottom corner of the bounding box
         :param bottom: y-coordinate of the right-bottom corner of the bounding box
+        :param input_raster: raster from which the subset to be created. It can be either the name of the static DEM file or url path for the user DEM file
         :param save_as: (optional) subset dem tif file to save as (file name with path)
         :return: an object of type ServiceRequest
 
-        example call format: http://129.123.41.184:20199/api/dataservice/rastersubset?xmin=-111.97&ymax=42.11&xmax=-111.35&ymin=41.66&output_raster=logan.tif
+        example call format: http://129.123.41.184:20199/api/dataservice/rastersubset?xmin=-111.97&ymax=42.11&xmax=-111.35&ymin=41.66&input_raster=nedWesternUS.tif&output_raster=logan.tif
         """
 
         #url = 'http://129.123.41.158:8080/subsetdem'
@@ -401,7 +402,7 @@ class HydroDS(object):
             self._validate_file_save_as(save_as)
 
         #payload = {'bbox': str(left) + ' ' + str(top) + ' ' + str(right) + ' ' + str(bottom)}
-        payload = {'xmin': left, 'ymin': bottom, 'xmax': right, 'ymax': top}
+        payload = {'xmin': left, 'ymin': bottom, 'xmax': right, 'ymax': top, 'input_raster': input_raster}
         if output_raster:
             self._validate_output_raster_file_name(output_raster)
             payload['output_raster'] = output_raster
@@ -434,7 +435,7 @@ class HydroDS(object):
         response = self.requests.get(url, params=payload)
         return self._process_service_response(response, 'generate_watershed_raster', save_as)
 
-    def subset_raster(self, input_raster_url_path, ref_raster_url_path, output_raster=None, save_as=None):
+    def subset_raster_to_reference(self, input_raster_url_path, ref_raster_url_path, output_raster=None, save_as=None):
         #self._check_user_irods_authentication()
 
         if save_as:
@@ -513,6 +514,24 @@ class HydroDS(object):
         payload = {"raster": input_raster_name}
         response = self.requests.get(url, params=payload)
         return self._process_service_response(response, "subset_NLCD_to_reference_raster", save_as)
+
+    def get_canopy_variable(self, input_NLCD_raster_url_path, variable_name, output_netcdf=None):
+
+        #URL: http://hostname/api/dataservice/getcanopyvariables?in_NLCDraster=http://hostname/
+        # files/data/user_2/nlncd_spwan_proj_clip.tif
+
+        # call with canopy variable 'cc':
+        #URL: http://hostname/api/dataservice/getcanopyvariable?in_NLCDraster=http://hostname/files
+        # /data/user_2/nlncd_spwan_proj_clip.tif&variable_name=cc&out_netcdf=cc_1.nc
+
+        url = self._get_dataservice_specific_url('getcanopyvariable')
+        payload = {"in_NLCDraster": input_NLCD_raster_url_path, 'variable_name': variable_name}
+        if output_netcdf:
+            self._validate_output_netcdf_file_name(output_netcdf)
+            payload['output_netcdf'] = output_netcdf
+
+        response = self._make_data_service_request(url=url, params=payload)
+        return self._process_dataservice_response(response, save_as=None)
 
     def get_canopy_variables(self, input_NLCD_raster_url_path, output_ccNetCDF=None, output_hcanNetCDF=None,
                              output_laiNetCDF=None):

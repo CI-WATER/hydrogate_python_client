@@ -14,9 +14,10 @@ hds = HydroDS(username=settings.USER_NAME, password=settings.PASSWORD)
 
 try:
     # param: output_raster is optional
-    response_data = hds.subset_dem(left=-111.97, top=42.11, right=-111.35, bottom=41.66,
-                                   output_raster='subset_dem_logan.tif',
-                                   save_as=r'E:\Scratch\HydroGateClientDemo\nedLogan_1B.tif')
+    response_data = hds.subset_raster(left=-111.97, top=42.11, right=-111.35, bottom=41.66,
+                                      input_raster='nedWesternUS.tif', output_raster='subset_dem_logan_2.tif',
+                                      save_as=r'E:\Scratch\HydroGateClientDemo\nedLogan_1C.tif')
+
     output_subset_dem_url = response_data['output_raster']
     print(output_subset_dem_url)
 except Exception as ex:
