@@ -857,7 +857,7 @@ class HydroDS(object):
         response = self._make_data_service_request(url=url, params=payload)
         return self._process_dataservice_response(response, save_as)
 
-    def resample_raster(self, input_raster_url_path, cell_size_dx, cell_size_dy, output_raster=None, save_as=None):
+    def resample_raster(self, input_raster_url_path, cell_size_dx, cell_size_dy, resample=None, output_raster=None, save_as=None):
         if save_as:
             self._validate_file_save_as(save_as)
 
@@ -866,6 +866,9 @@ class HydroDS(object):
 
         url = self._get_dataservice_specific_url('resampleraster')
         payload = {"input_raster": input_raster_url_path, 'dx': cell_size_dx, 'dy': cell_size_dy}
+        if resample:
+            payload['resample'] = resample
+
         if output_raster:
             self._validate_output_raster_file_name(output_raster)
             payload['output_raster'] = output_raster
