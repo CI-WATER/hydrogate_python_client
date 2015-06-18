@@ -931,40 +931,14 @@ class HydroDS(object):
         return service_req
 
     def upload_file(self, file_to_upload):
-        import urllib2
         if not os.path.isfile(file_to_upload):
             raise Exception("Error: Specified file to upload (%s) does not exist." % file_to_upload)
 
         url = self._get_dataservice_specific_url('myfiles/upload')
-        #upload_file_obj = open(file_to_upload, 'rb')
-        #upload_file_obj = {'file': open(file_to_upload, 'rb')}
         with open(file_to_upload, 'rb') as upload_file_obj:
             response = self._make_data_service_request(url=url, http_method='POST', files={'file': upload_file_obj})
-            #response = self.requests.put(url, files={'file': upload_file_obj})
 
         return self._process_dataservice_response(response, save_as=None)
-        # file_size = os.path.getsize(file_to_upload)
-        # headers = {'content-type': 'application/octet-stream'}
-        # with open(file_to_upload, 'rb') as upload_file_obj:
-        #     response = self.requests.put(url, data=upload_file_obj.read(), params={'file': os.path.basename(file_to_upload)}, headers=headers)
-        #response = self.requests.put(url, data=upload_file_obj, headers=headers)
-
-        # if response.status_code != requests.codes.ok:
-        #     raise Exception("Error: HydroGate connection error.")
-        #
-        # response_dict = json.loads(response.content)
-        # if response_dict['ret'] == 'success':
-        #     uploaded_file_url = response_dict['url']
-        #     print ("File upload was successful.")
-        #     print("Uploaded file URL path:%s" % uploaded_file_url)
-        #     service_req = ServiceRequest(service_name='upload_file', service_id_name='',
-        #                                  service_id_value='', service_status='success', file_path=uploaded_file_url)
-        #     _ServiceLog.add(service_req)
-        #     self.save_service_call_history()
-        #     print(service_req.to_json())
-        #     return service_req
-        # else:
-        #     self._raise_service_error(response_dict['message'])
 
     def download_file(self, file_url_path, save_as):
         self._validate_file_save_as(save_as)
@@ -982,6 +956,22 @@ class HydroDS(object):
                 file_obj.write(block)
 
         print("Downloaded file saved successfully at:{file_location}".format(file_location=save_as))
+
+    def zip_files(self, files_to_zip, zip_file_name, save_as=None):
+        # validate parameters
+        if save_as:
+            self._validate_file_save_as(save_as)
+        if type(files_to_zip) is not list:
+            raise Exception("Error: Invalid parameter value:{param}. It should be a list.".format(param=files_to_zip))
+
+        if not self._validate_file_name(zip_file_name, ext='.zip'):
+            raise Exception('Error: {file_name} is not a valid zip file name.'.format(file_name=zip_file_name))
+
+        file_names = ','.join(files_to_zip)
+        url = self._get_dataservice_specific_url('myfiles/zip')
+        payload = {"file_names": file_names, 'zip_file_name': zip_file_name}
+        response = self._make_data_service_request(url, params=payload)
+        return self._process_dataservice_response(response, save_as)
 
     def download_file_old(self, file_url_path, save_as):
         self._check_user_irods_authentication()
@@ -1081,11 +1071,15 @@ class HydroDS(object):
         _ServiceLog.delete_all()
         print ("Service call history deleted.")
 
-    def _validate_file_name(self, file_name):
+    def _validate_file_name(self, file_name, ext=None):
         try:
             name_part, ext_part = os.path.splitext(file_name)
             if len(name_part) == 0 or len(ext_part) < 2:
                 return False
+
+            if ext:
+                if ext != ext_part:
+                    return False
 
             ext_part = ext_part[1:]
             for c in ext_part:
