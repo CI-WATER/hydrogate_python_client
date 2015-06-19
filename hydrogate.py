@@ -391,6 +391,27 @@ class HydroDS(object):
         return self._process_dataservice_response(response, save_as=None)
 
     def delete_my_file(self, file_name):
+        """
+        Deletes a user file on the server
+        :param file_name: name of the file to be deleted from the HydroDS ap server
+        :return: name of the file that got deleted
+
+        :raises: HydroDSArgumentException: one or more argument failed validation at client side
+        :raises: HydroDSBadRequestException: one or more argument failed validation on the server side
+        :raises: HydroDSNotAuthenticatedException: provided user account failed validation
+        :raises: HydroDSNotAuthorizedException: user making this request is not authorized to do so
+        :raises: HydroDSNotFoundException: specified file to be deleted does not exist on the server
+
+        Example usage:
+            hds = HydroDS(username=your_username, password=your_password)
+            hds_response_data = hds.delete_my_file(file_name=logan.tif)
+
+            # print name of the file that got deleted
+            print(hds_response_data)
+        """
+        if not self._validate_file_name(file_name):
+            raise HydroDSArgumentException("{file_name} is not a valid file name".format(file_name=file_name))
+
         url = self._get_dataservice_specific_url('myfiles/delete/{file_name}'.format(file_name=file_name))
         response = self._make_data_service_request(url=url, http_method='DELETE')
         return self._process_dataservice_response(response, save_as=None)
