@@ -1,9 +1,11 @@
 __author__ = 'Pabitra'
 
-# TODO : check if this test has any dependency on other tests
+""" This is an example usage of the 'create_outlet_shape_file' HydroDS client api """
+
 from hydrogate import HydroDS
 import settings
 
+# Create HydroDS object passing user login account for HydroDS api server
 hds = HydroDS(username=settings.USER_NAME, password=settings.PASSWORD)
 
 try:

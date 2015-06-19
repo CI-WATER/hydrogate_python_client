@@ -1,12 +1,11 @@
 __author__ = 'Pabitra'
 
-"""
-Run this test after running generate_outlet_shapefile tests
-"""
+""" This is an example usage of the 'delineate_watershed' HydroDS client api """
+
 from hydrogate import HydroDS
 import settings
 
-# account for django api server
+# Create HydroDS object passing user login account for HydroDS api server
 hds = HydroDS(username=settings.USER_NAME, password=settings.PASSWORD)
 
 # run the subset dem to get the output raster to be used as an input for delineation
@@ -20,7 +19,6 @@ try:
     print(output_delineated_raster_url)
 except Exception as ex:
     print(ex.message)
-
 
 print ">>>> DONE..."
 exit()

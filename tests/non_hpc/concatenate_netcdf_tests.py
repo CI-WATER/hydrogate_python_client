@@ -1,8 +1,11 @@
 __author__ = 'Pabitra'
 
+""" This is an example usage of the 'concatenate_netcdf' HydroDS client api """
+
 from hydrogate import HydroDS
 import settings
 
+# Create HydroDS object passing user login account for HydroDS api server
 hds = HydroDS(username=settings.USER_NAME, password=settings.PASSWORD)
 
 # NOTE: this file path is valid for user with id 2
@@ -23,7 +26,6 @@ try:
     print(prcp_2011_subset_netcdf_url)
 
     # concatenate the above 2 output netcdf files
-    # param: output_netcdf is optional
     response_data = hds.concatenate_netcdf(input_netcdf1_url_path=prcp_2010_subset_netcdf_url,
                                            input_netcdf2_url_path=prcp_2011_subset_netcdf_url,
                                            output_netcdf='prcp_2010_2011_spawn.nc')

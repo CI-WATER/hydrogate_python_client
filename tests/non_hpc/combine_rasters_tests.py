@@ -1,8 +1,11 @@
 __author__ = 'Pabitra'
 
+""" This is an example usage of the 'subset_dem' HydroDS client api """
+
 from hydrogate import HydroDS
 import settings
 
+# Create HydroDS object passing user login account for HydroDS api server
 hds = HydroDS(username=settings.USER_NAME, password=settings.PASSWORD)
 
 # first create 2 rasters then can be joined

@@ -1,8 +1,11 @@
 __author__ = 'Pabitra'
 
+""" This is an example usage of the 'get_canopy_variables' HydroDS client api """
+
 from hydrogate import HydroDS
 import settings
 
+# Create HydroDS object passing user login account for HydroDS api server
 hds = HydroDS(username=settings.USER_NAME, password=settings.PASSWORD)
 
 # NOTE: this file path is valid for user with id 2
