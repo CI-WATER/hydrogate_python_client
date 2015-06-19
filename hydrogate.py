@@ -486,23 +486,74 @@ class HydroDS(object):
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
 
-    def create_raster_slope(self, input_raster_url_path, output_raster=None, save_as=None):
+    def create_raster_slope(self, input_raster_url_path, output_raster, save_as=None):
+        """
+        Creates a raster with slope data
+
+        :param input_raster_url_path: url file path of the raster file on HydroDS api server for which slope data
+        is needed
+        :param output_raster: name of the output slope raster file
+        :param save_as: (optional) raster file name and file path to save the generated slope raster file locally
+        :return:a dictionary with key 'output_raster' and value of url path for the slope raster file
+
+        :raises: HydroDSArgumentException: one or more argument failed validation at client side
+        :raises: HydroDSBadRequestException: one or more argument failed validation on the server side
+        :raises: HydroDSNotAuthenticatedException: provided user account failed validation
+        :raises: HydroDSNotAuthorizedException: user making this request is not authorized to do so
+        :raises: HydroDSNotFoundException: specified raster input file does not exist on the server
+
+        Example usage:
+            hds = HydroDS(username=your_username, password=your_password)
+            hds_response_data = hds.create_raster_slope(input_raster_url_path=raster_url,
+                                                        output_raster='slope_raster.tif',
+                                                        save_as=r'C:\hydro-ds\slope_raster.tif')
+
+            # print url path of the slope raster file
+            output_slope_raster_url = hds_response_data['output_raster']
+            print(output_slope_raster_url)
+        """
         return self._create_raster_slope_or_aspect('computerasterslope', input_raster_url_path, output_raster, save_as)
 
-    def create_raster_aspect(self, input_raster_url_path, output_raster=None, save_as=None):
+    def create_raster_aspect(self, input_raster_url_path, output_raster, save_as=None):
+        """
+        Creates a raster with aspect data
+
+        :param input_raster_url_path: url file path of the raster file on HydroDS api server for which aspect data
+        is needed
+        :param output_raster: name of the output aspect raster file
+        :param save_as: (optional) raster file name and file path to save the generated aspect raster file locally
+        :return:a dictionary with key 'output_raster' and value of url path for the slope raster file
+
+        :raises: HydroDSArgumentException: one or more argument failed validation at client side
+        :raises: HydroDSBadRequestException: one or more argument failed validation on the server side
+        :raises: HydroDSNotAuthenticatedException: provided user account failed validation
+        :raises: HydroDSNotAuthorizedException: user making this request is not authorized to do so
+        :raises: HydroDSNotFoundException: specified raster input file does not exist on the server
+
+        Example usage:
+            hds = HydroDS(username=your_username, password=your_password)
+            hds_response_data = hds.create_raster_aspect(input_raster_url_path=raster_url,
+                                                        output_raster='aspect_raster.tif',
+                                                        save_as=r'C:\hydro-ds\aspect_raster.tif')
+
+            # print url path of the aspect raster file
+            output_aspect_raster_url = hds_response_data['output_raster']
+            print(output_aspect_raster_url)
+        """
+
         return self._create_raster_slope_or_aspect('computerasteraspect', input_raster_url_path, output_raster, save_as)
 
-    def _create_raster_slope_or_aspect(self, service_name,  input_raster_url_path, output_raster=None, save_as=None):
+    def _create_raster_slope_or_aspect(self, service_name,  input_raster_url_path, output_raster, save_as=None):
         if save_as:
             self._validate_file_save_as(save_as)
 
         url = self._get_dataservice_specific_url(service_name)
         payload = {"input_raster": input_raster_url_path}
-        if output_raster:
+        if not self._validate_file_name(output_raster, ext='.tif'):
             err_msg = "Invalid output raster file name:{file_name}".format(file_name=output_raster)
-            if len(output_raster.strip()) < 5 or not output_raster.endswith('.tif'):
-                raise ValueError(err_msg)
-            payload['output_raster'] = output_raster
+            raise HydroDSArgumentException(err_msg)
+
+        payload['output_raster'] = output_raster
 
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
