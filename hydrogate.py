@@ -580,17 +580,40 @@ class HydroDS(object):
         response = self._make_data_service_request(url=url, params=payload)
         return self._process_dataservice_response(response, save_as=None)
 
-    def combine_rasters(self, input_one_raster_url_path, input_two_raster_url_path, output_raster=None, save_as=None):
+    def combine_rasters(self, input_one_raster_url_path, input_two_raster_url_path, output_raster, save_as=None):
+        """
+        Combines two rasters to create a new raster
+
+        :param input_one_raster_url_path: url file path for the 1st raster file on HydroDS api server
+        :param input_two_raster_url_path: url file path for the 2nd raster file on HydroDS api server
+        :param output_raster: name of the output (combined) raster file
+        :param save_as: (optional) raster file name and file path to save the generated combined raster file locally
+        :return: a dictionary with key 'output_raster' and value of url path for the combined raster file
+
+        :raises: HydroDSArgumentException: one or more argument failed validation at client side
+        :raises: HydroDSBadRequestException: one or more argument failed validation on the server side
+        :raises: HydroDSNotAuthenticatedException: provided user account failed validation
+        :raises: HydroDSNotAuthorizedException: user making this request is not authorized to do so
+        :raises: HydroDSNotFoundException: specified netcdf input file(s) does not exist on the server
+
+        Example usage:
+            hds = HydroDS(username=your_username, password=your_password)
+            hds_response_data = hds.combine_rasters(input_one_raster_url_path=raster_one_url,
+                                                    input_two_raster_url_path=raster_two_url,
+                                                    output_raster='combined_rasters.tif',
+                                                    save_as=r'C:\hydro-ds\combined_raster.tif')
+
+            # print url path of the combined raster file
+            output_combined_raster_url = hds_response_data['output_raster']
+            print(output_combined_raster_url)
+        """
         if save_as:
             self._validate_file_save_as(save_as)
 
-        # Example: http://129.123.41.184:20199/api/dataservice/combinerasters?input_raster1=http://129.123.41.184:20199/files/data/test_raster1.tif&input_raster2=http://129.123.41.184:20199/files/data/test_raster2.tif
-
         url = self._get_dataservice_specific_url('combinerasters')
         payload = {"input_raster1": input_one_raster_url_path, "input_raster2": input_two_raster_url_path}
-        if output_raster:
-            self._validate_output_raster_file_name(output_raster)
-            payload['output_raster'] = output_raster
+        self._validate_output_raster_file_name(output_raster)
+        payload['output_raster'] = output_raster
 
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
@@ -691,6 +714,7 @@ class HydroDS(object):
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
 
+    # TODO: this method has been replaced by the concatenate_netcdf method - need to delete this one
     def combine_netcdf(self, input_one_netcdf_url_path, input_two_netcdf_url_path, save_as=None):
         """
         Joins/combines two netcdf files to one netcdf file
@@ -810,7 +834,7 @@ class HydroDS(object):
         :param input_netcdf2_url_path: url file path for the 2nd netcdf file on HydroDS api server
         :param output_netcdf: name of the output (concatenated) netcdf file
         :param save_as: (optional) netcdf file name and file path to save the generated concatenated netcdf file locally
-        :return: returns a dictionary with key 'output_netcdf' and value of url path for the joined netcdf file
+        :return: a dictionary with key 'output_netcdf' and value of url path for the joined netcdf file
 
         :raises: HydroDSArgumentException: one or more argument failed validation at client side
         :raises: HydroDSBadRequestException: one or more argument failed validation on the server side
@@ -820,13 +844,15 @@ class HydroDS(object):
 
         Example usage:
             hds = HydroDS(username=your_username, password=your_password)
-            hds_response = hds.concatenate_netcdf(input_netcdf1_url_path='url_path_for_1st_netcdf_file',
-                                                  input_netcdf2_url_path='url_path_for_2nd_netcdf_file',
-                                                  output_netcdf='concatenated.nc',
-                                                  save_as='C://hydro-DS_test/concatenated_prcp_2015.nc')
+            hds_response_data = hds.concatenate_netcdf(input_netcdf1_url_path='url_path_for_1st_netcdf_file',
+                                                       input_netcdf2_url_path='url_path_for_2nd_netcdf_file',
+                                                       output_netcdf='concatenated.nc',
+                                                       save_as=r'C:\hydro-DS_test\concatenated_prcp_2015.nc')
 
             # print the url path for the concatenated netcdf file
-            print(hds_response['output_netcdf'])
+            output_concatenated_netcdf_url = hds_response_data['output_netcdf']
+            print(output_concatenated_netcdf_url)
+
         """
         if save_as:
             self._validate_file_save_as(save_as)
