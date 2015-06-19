@@ -895,19 +895,41 @@ class HydroDS(object):
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
 
-    def create_outlet_shapefile(self, point_x, point_y, output_shape_file=None, save_as=None):
+    def create_outlet_shapefile(self, point_x, point_y, output_shape_file_name, save_as=None):
+        """
+        Create an outlet shapefile. The generated shapefile is stored on the server as a zip file
+
+        :param point_x: X-coordinate of outlet point
+        :param point_y: Y-coordinate of outlet point
+        :param output_shape_file_name: name of the outlet shapefile
+        :param save_as: (optional) shapefile name and file path to save the generated shapefile locally
+        :return: a dictionary with key 'output_shape_file' and value of url path for the outlet shapefile
+
+        :raises: HydroDSArgumentException: one or more argument failed validation at client side
+        :raises: HydroDSBadRequestException: one or more argument failed validation on the server side
+        :raises: HydroDSNotAuthenticatedException: provided user account failed validation
+        :raises: HydroDSNotAuthorizedException: user making this request is not authorized to do so
+
+        Example usage:
+            hds = HydroDS(username=your_username, password=your_password)
+            hds_response_data = hds.create_outlet_shapefile(point_x=-111.787, point_y=41.742,
+                                                            output_shape_file='outlet-shape.shp'
+                                                            save_as=r'C:\hydro-DS_test\outlet.zip')
+
+            # print the url path for the outlet shapefile
+            output_outlet_shape_file_url = hds_response_data['output_shape_file_name']
+            print(output_outlet_shape_file_url)
+        """
         if save_as:
             self._validate_file_save_as(save_as)
 
-        # URL: http://129.123.41.158:8080/createoutletshp?outletpointx=-111.576&outletpointy=41.829
-
         url = self._get_dataservice_specific_url(service_name='createoutletshapefile')
         payload = {"outletPointX": point_x, 'outletPointY': point_y}
-        if output_shape_file:
-            err_msg = "Invalid output file name:{file_name}".format(file_name=output_shape_file)
-            if len(output_shape_file.strip()) < 5 or not output_shape_file.endswith('.shp'):
-                raise ValueError(err_msg)
-            payload['output_shape_file_name'] = output_shape_file
+        if not self._validate_file_name(output_shape_file_name, ext='.shp'):
+            raise HydroDSArgumentException('{file_name} is not a valid shapefile '
+                                           'name.'.format(file_name=output_shape_file_name))
+
+        payload['output_shape_file_name'] = output_shape_file_name
 
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
