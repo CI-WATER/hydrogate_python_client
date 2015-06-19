@@ -10,6 +10,26 @@ import pickle
 import datetime
 
 # TODO: create a custom Exception class
+class HydroDSException(Exception):
+    pass
+
+class HydroDSArgumentException(Exception):
+    pass
+
+class HydroDSServerException(Exception):
+    pass
+
+class HydroDSBadRequestException(Exception):
+    pass
+
+class HydroDSNotAuthorizedException(Exception):
+    pass
+
+class HydroDSNotAuthenticatedException(Exception):
+    pass
+
+class HydroDSNotFoundException(Exception):
+    pass
 
 def singleton(cls):
     instances = {}
@@ -671,28 +691,26 @@ class HydroDS(object):
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
 
-    def concatenate_netcdf(self, input_one_netcdf_url_path, input_two_netcdf_url_path, save_as=None):
-        if save_as:
-            if not self._validate_file_save_as(save_as):
-                return
-
-        input_one_netcdf_name = self._get_file_name_from_url_file_path(input_one_netcdf_url_path)
-        input_two_netcdf_name = self._get_file_name_from_url_file_path(input_two_netcdf_url_path)
-        #URL: http://129.123.41.158:8080/concatenatenetcdf?inputnc1=prcpLog_2010.nc&inputnc2=prcpLog_2011.nc
-        url = self.dataservice_base_url + '/concatenatenetcdf'
-        payload = {"inputnc1": input_one_netcdf_name, "inputnc2": input_two_netcdf_name}
-        response = self.requests.get(url, params=payload)
-        return self._process_service_response(response, "concatenate_netcdf", save_as)
-
     def combine_netcdf(self, input_one_netcdf_url_path, input_two_netcdf_url_path, save_as=None):
+        """
+        Joins/combines two netcdf files to one netcdf file
+        :param input_one_netcdf_url_path: url file path for the 1st netcdf file on HydroDS api server
+        :param input_two_netcdf_url_path: url file path for the 2nd netcdf file on HydroDS api server
+        :param save_as: (optional) file name and path to save the joined netcdf file locally
+        :return: returns a dictionary with key 'output_netcdf' and value of url path for the joined netcdf file
+
+        :raises:
+            HydroDSArgumentException: one or more arguments failed validation
+
+        """
         if save_as:
-            if not self._validate_file_save_as(save_as):
-                return
+            self._validate_file_save_as(save_as)
 
         input_one_netcdf_name = self._get_file_name_from_url_file_path(input_one_netcdf_url_path)
         input_two_netcdf_name = self._get_file_name_from_url_file_path(input_two_netcdf_url_path)
 
-        # Example: http://129.123.41.158:8080/combinenetcdf?inputnc1=netcdf24685a2f0387402dabf46bf7b56abdcb.nc&inputnc2=netcdffd9a5b6f7d634d1cbd5325b98899b073.nc
+        # Example: http://129.123.41.158:8080/combinenetcdf?inputnc1=netcdf24685a2f0387402dabf46bf7b56abdcb.nc&
+        # inputnc2=netcdffd9a5b6f7d634d1cbd5325b98899b073.nc
 
         url = self.dataservice_base_url + '/combinenetcdf'
         payload = {"inputnc1": input_one_netcdf_name, "inputnc2": input_two_netcdf_name}
@@ -784,15 +802,39 @@ class HydroDS(object):
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
 
-    def concatenate_netcdf(self, input_netcdf1_url_path, input_netcdf2_url_path, output_netcdf=None, save_as=None):
+    def concatenate_netcdf(self, input_netcdf1_url_path, input_netcdf2_url_path, output_netcdf, save_as=None):
+        """
+        Joins two netcdf files to create a new netcdf file
+
+        :param input_netcdf1_url_path: url file path for the 1st netcdf file on HydroDS api server
+        :param input_netcdf2_url_path: url file path for the 2nd netcdf file on HydroDS api server
+        :param output_netcdf: name of the output (concatenated) netcdf file
+        :param save_as: (optional) netcdf file name and file path to save the generated concatenated netcdf file locally
+        :return: returns a dictionary with key 'output_netcdf' and value of url path for the joined netcdf file
+
+        :raises: HydroDSArgumentException: one or more argument failed validation at client side
+        :raises: HydroDSBadRequestException: one or more argument failed validation on the server side
+        :raises: HydroDSNotAuthenticatedException: provided user account failed validation
+        :raises: HydroDSNotAuthorizedException: user making this request is not authorized to do so
+        :raises: HydroDSNotFoundException: specified netcdf input file(s) does not exist on the server
+
+        Example usage:
+            hds = HydroDS(username=your_username, password=your_password)
+            hds_response = hds.concatenate_netcdf(input_netcdf1_url_path='url_path_for_1st_netcdf_file',
+                                                  input_netcdf2_url_path='url_path_for_2nd_netcdf_file',
+                                                  output_netcdf='concatenated.nc',
+                                                  save_as='C://hydro-DS_test/concatenated_prcp_2015.nc')
+
+            # print the url path for the concatenated netcdf file
+            print(hds_response['output_netcdf'])
+        """
         if save_as:
             self._validate_file_save_as(save_as)
 
         url = self._get_dataservice_specific_url('concatenatenetcdf')
         payload = {"input_netcdf1": input_netcdf1_url_path, "input_netcdf2": input_netcdf2_url_path}
-        if output_netcdf:
-            self._validate_output_netcdf_file_name(output_netcdf)
-            payload['output_netcdf'] = output_netcdf
+        self._validate_output_netcdf_file_name(output_netcdf)
+        payload['output_netcdf'] = output_netcdf
 
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
@@ -1001,12 +1043,12 @@ class HydroDS(object):
     def _validate_output_raster_file_name(self, file_name):
         err_msg = "Invalid output raster file name:{file_name}".format(file_name=file_name)
         if len(file_name.strip()) < 5 or not file_name.endswith('.tif'):
-            raise ValueError(err_msg)
+            raise HydroDSArgumentException(err_msg)
 
     def _validate_output_netcdf_file_name(self, file_name):
         err_msg = "Invalid output netcdf file name:{file_name}".format(file_name=file_name)
         if len(file_name.strip()) < 4 or not file_name.endswith('.nc'):
-            raise ValueError(err_msg)
+            raise HydroDSArgumentException(err_msg)
 
     def _make_data_service_request(self, url, http_method='GET', params=None, data=None, files=None):
         if http_method == 'GET':
@@ -1023,7 +1065,18 @@ class HydroDS(object):
 
     def _process_dataservice_response(self, response, save_as=None):
         if response.status_code != requests.codes.ok:
-            raise Exception("CIWATER Data Service Error. {response_err}".format(response_err=response.reason))
+            if response.status_code == 400:
+                raise HydroDSBadRequestException("HydroDS Service Error. {response_err}".format(response_err=response.reason))
+            elif response.status_code == 401:
+                raise HydroDSNotAuthenticatedException("HydroDS Service Error. {response_err}".format(response_err=response.reason))
+            elif response.status_code == 403:
+                raise HydroDSNotAuthorizedException("HydroDS Service Error. {response_err}".format(response_err=response.reason))
+            elif response.status_code == 404:
+                raise HydroDSNotFoundException("HydroDS Service Error. {response_err}".format(response_err=response.reason))
+            elif response.status_code == 500:
+                raise HydroDSServerException("HydroDS Service Error. {response_err}".format(response_err=response.reason))
+            else:
+                raise HydroDSException("HydroDS Service Error. {response_err}".format(response_err=response.reason))
 
         response_dict = response.json() # json.loads(response.content)
         if response_dict['success']:
@@ -1062,7 +1115,7 @@ class HydroDS(object):
             self._raise_service_error(response_dict['message'])
 
     def _raise_service_error(self, message):
-        raise Exception("Error:%s" % message)
+        raise HydroDSException("Error:%s" % message)
 
     def save_service_call_history(self):
         _ServiceLog.save()
@@ -1097,19 +1150,21 @@ class HydroDS(object):
     def _validate_file_save_as(self, save_as, file_ext=None):
         save_file_dir = os.path.dirname(save_as)
         if not os.path.exists(save_file_dir):
-            raise Exception("Error: Specified save to file path (%s) does not exist." % save_file_dir)
+            raise HydroDSArgumentException("Specified file path (%s) to save does not exist." % save_file_dir)
 
         if not os.access(save_file_dir, os.W_OK):
-            raise Exception("Error: You do not have write permissions to directory '{0}'.".format(save_file_dir))
+            raise HydroDSArgumentException("You do not have write permissions to directory '{0}'.".format(save_file_dir))
 
         file_name = os.path.basename(save_as)
         if not self._validate_file_name(file_name):
-            raise Exception("Error: Invalid file name (%s)." % file_name)
+            raise HydroDSArgumentException("{file_name} is not a valid file name for saving the output "
+                                           "file.".format(file_name=file_name))
 
         if file_ext:
             file_extension = os.path.splitext(save_as)[1]
             if file_extension != file_ext:
-                raise Exception("Error: Invalid save file type:%s. File type must be:%s " % (file_extension, file_ext))
+                raise HydroDSArgumentException("Invalid save as file type:{file_extension}. File type must "
+                                               "be:{file_ext}".format(file_extension=file_extension, file_ext=file_ext))
 
     def _check_user_irods_authentication(self):
         if not self.user_irods_authenticated:
