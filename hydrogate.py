@@ -607,24 +607,47 @@ class HydroDS(object):
         response = self.requests.get(url, params=payload)
         return self._process_service_response(response, "subset_NLCD_to_reference_raster", save_as)
 
-    def get_canopy_variable(self, input_NLCD_raster_url_path, variable_name, output_netcdf=None):
+    def get_canopy_variable(self, input_NLCD_raster_url_path, variable_name, output_netcdf, save_as=None):
+        """
+        Generates a netcdf file that contains NLCD data for a given variable
 
-        #URL: http://hostname/api/dataservice/getcanopyvariables?in_NLCDraster=http://hostname/
-        # files/data/user_2/nlncd_spwan_proj_clip.tif
+        :param input_NLCD_raster_url_path: url file path for the raster for which NLCD data needs to be generated
+        :param variable_name: name of the data variable (valid variable names are: 'cc', 'hcan', 'lai')
+        :param output_netcdf: name for the output netcdf file
+        :return: a dictionary with key 'output_netcdf' and value of url path for the netcdf file generated
 
-        # call with canopy variable 'cc':
-        #URL: http://hostname/api/dataservice/getcanopyvariable?in_NLCDraster=http://hostname/files
-        # /data/user_2/nlncd_spwan_proj_clip.tif&variable_name=cc&out_netcdf=cc_1.nc
+        :raises: HydroDSArgumentException: one or more argument failed validation at client side
+        :raises: HydroDSBadRequestException: one or more argument failed validation on the server side
+        :raises: HydroDSNotAuthenticatedException: provided user account failed validation
+        :raises: HydroDSNotAuthorizedException: user making this request is not authorized to do so
+        :raises: HydroDSNotFoundException: specified raster input file does not exist on the server
+
+        Example usage:
+            hds = HydroDS(username=your_username, password=your_password)
+            input_NLCD_raster_url_path = 'http://hydro-ds.uwrl.usu.edu:20199/files/data/user_2/nlcd_proj_spwan.tif'
+            hds_response_data = hds.get_canopy_variable(input_NLCD_raster_url_path=input_NLCD_raster_url_path,
+                                                        variable_name='cc', output_netcdf='nlcd_cc_spwan.nc',
+                                                        save_as=r'C:\hydro-DS_test\nlcd_cc_spwan.nc')
+
+            # print the url path for the generated netcdf file containing canopy variable data
+            output_canopy_netcdf_url = hds_response_data['output_netcdf']
+            print(output_canopy_netcdf_url)
+
+        """
+
+        if save_as:
+            self._validate_file_save_as(save_as)
 
         url = self._get_dataservice_specific_url('getcanopyvariable')
         payload = {"in_NLCDraster": input_NLCD_raster_url_path, 'variable_name': variable_name}
-        if output_netcdf:
-            self._validate_output_netcdf_file_name(output_netcdf)
-            payload['output_netcdf'] = output_netcdf
+        self._validate_file_name(output_netcdf, ext='.nc')
+        payload['output_netcdf'] = output_netcdf
 
         response = self._make_data_service_request(url=url, params=payload)
-        return self._process_dataservice_response(response, save_as=None)
+        return self._process_dataservice_response(response, save_as=save_as)
 
+    # TODO: We should not support the following method. The functionality of this mkethod can be achieved by calling
+    # 3 time the get_canopy_variable() method
     def get_canopy_variables(self, input_NLCD_raster_url_path, output_ccNetCDF=None, output_hcanNetCDF=None,
                              output_laiNetCDF=None):
 
