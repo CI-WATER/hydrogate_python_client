@@ -1146,21 +1146,40 @@ class HydroDS(object):
         return self._process_dataservice_response(response, save_as=None)
 
     def download_file(self, file_url_path, save_as):
+        """
+        Download a file (that the user owns) from the HydroDS server
+
+        :param file_url_path: url for the file to be downloaded
+        :param save_as: file name and file path to save the downloaded file
+        :return: nothing
+
+        :raises: HydroDSArgumentException: one or more argument failed validation at client side
+        :raises: HydroDSNotAuthenticatedException: provided user account failed validation
+        :raises: HydroDSNotAuthorizedException: user making this request is not authorized to do so
+        :raises: HydroDSNotFoundException: specified file to download does not exist on the server
+
+        Example usage:
+            hds = HydroDS(username=your_username, password=your_password)
+            url_path_for_the_file_to_download = 'http://hydro-ds.uwrl.usu.edu:20199/files/data/user_2/nlcd_proj_spwan.tif'
+            hds.download_file(file_url_path=url_path_for_the_file_to_download, save_as=r'C:\hydro-ds\nlcd_proj_spwan.tif')
+
+            print("File download was successful")
+
+        """
         self._validate_file_save_as(save_as)
 
         with open(save_as, 'wb') as file_obj:
             response = requests.get(file_url_path, stream=True, auth=self.authorization)
 
             if not response.ok:
-                # Something went wrong
-                raise Exception("Error: Error in downloading the file.\n {reason}".format(reason=response.reason))
+                # raise appropriate HydroDS exception
+                self._process_dataservice_response(response)
 
             for block in response.iter_content(1024):
                 if not block:
                     break
                 file_obj.write(block)
 
-        print("Downloaded file saved successfully at:{file_location}".format(file_location=save_as))
 
     def zip_files(self, files_to_zip, zip_file_name, save_as=None):
         # validate parameters
