@@ -386,6 +386,21 @@ class HydroDS(object):
             raise Exception('Error:%s' % response_dict['description'])
 
     def list_my_files(self):
+        """
+        Lists url file paths for all the files the user owns
+
+        :return: List of url file paths
+
+        :raises: HydroDSNotAuthenticatedException: provided user account failed validation
+
+        Example usage:
+            hds = HydroDS(username=your_username, password=your_password)
+            hds_response_data = hds.list_my_file()
+            # print url file path all the files user owns
+            for file_url in response_data:
+                print(file_url)
+        """
+
         url = self._get_dataservice_specific_url('myfiles/list')
         response = self._make_data_service_request(url=url)
         return self._process_dataservice_response(response, save_as=None)
