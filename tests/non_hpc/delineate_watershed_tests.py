@@ -13,10 +13,13 @@ response_data = hds.subset_dem(left=-111.97, top=42.11, right=-111.35, bottom=41
 output_subset_dem_url = response_data['output_raster']
 
 try:
-    response_data = hds.delineate_watershed(utm_zone=12, threshold=60000, outlet_point_x=111.787,
-                                            outlet_point_y=41.742, input_raster_url_path=output_subset_dem_url)
-    output_delineated_raster_url = response_data['output_WS_raster']
+    response_data = hds.delineate_watershed(input_raster_url_path=output_subset_dem_url, outlet_point_x=111.787,
+                                            outlet_point_y=41.742, utm_zone=12, threshold=60000,
+                                            output_raster='logan_ws.tif', output_outlet_shapefile='logan_outlet.shp')
+    output_delineated_raster_url = response_data['output_raster']
     print(output_delineated_raster_url)
+    output_outlet_shapefile_url = response_data['output_outlet_shapefile']
+    print(output_outlet_shapefile_url)
 except Exception as ex:
     print(ex.message)
 

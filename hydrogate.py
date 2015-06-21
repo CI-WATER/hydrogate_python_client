@@ -1006,16 +1006,59 @@ class HydroDS(object):
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
 
+    # TODO: This method needs to be tested (6/19/2015)
     def delineate_watershed(self, input_raster_url_path, outlet_point_x, outlet_point_y, utm_zone, threshold,
-                            save_as=None):
+                            output_raster, output_outlet_shapefile, save_as=None):
+        """
+        Delineate watershed
+
+        :param input_raster_url_path: url file path for the raster file for which to delineate watershed
+        :param outlet_point_x: X-coordinate of the outlet point
+        :param outlet_point_y: Y-coordinate of the outlet point
+        :param utm_zone: utm zone value to be used
+        :param threshold: threshold value to be used
+        :param: output_raster: file name for the delineated watershed raster file
+        :param save_as: (optional) raster file name and file path to save the delineated watershed raster file locally
+        :return:a dictionary with key 'output_raster' and value of url path for the watershed raster file, and
+        key 'output_outlet_shapefile' and value of url path for the outlet shapefile
+
+        :raises: HydroDSArgumentException: one or more argument failed validation at client side
+        :raises: HydroDSBadRequestException: one or more argument failed validation on the server side
+        :raises: HydroDSNotAuthenticatedException: provided user account failed validation
+        :raises: HydroDSNotAuthorizedException: user making this request is not authorized to do so
+        :raises: HydroDSNotFoundException: specified raster input file does not exist on the server
+
+        Example usage:
+            hds = HydroDS(username=your_username, password=your_password)
+            hds_response_data = hds.delineate_watershed(input_raster_url_path=raster_url,
+                                                        outlet_point_x=111.787,
+                                                        outlet_point_y=41.742,
+                                                        utm_zone=12,
+                                                        threshold=60000,
+                                                        output_raster='logan_watershed.tif',
+                                                        output_outlet_shapefile='logan_outlet.shp',
+                                                        save_as=r'C:\hydro-ds\delineated_ws.tif')
+
+            # print url path of the delineated watershed raster file
+            output_delineated_raster_url = hds_response_data['output_raster']
+            print(output_delineated_raster_url)
+
+            # print the url path of the outlet shapefile
+            output_outlet_shapefile_url = hds_response_data['output_outlet_shapefile']
+            print(output_outlet_shapefile_url)
+        """
         if save_as:
             self._validate_file_save_as(save_as)
+        if not self._validate_file_name(output_raster, ext='.tif'):
+            raise HydroDSArgumentException("{file_name} is not a valid raster file name".format(file_name=output_raster))
 
-        # 129.123.41.184:20199/api/dataservice/delineatewatershed?utmZone=12&streamThreshold=60000&outletPointX=-111.787&outletPointY=41.742&input_DEM_raster=http://129.123.41.184:20199/files/data/user_2/test.tif
+        if not self._validate_file_name(output_outlet_shapefile, ext='.shp'):
+            raise HydroDSArgumentException("{file_name} is not a valid shapefile name".format(file_name=output_outlet_shapefile))
 
         url = self._get_dataservice_specific_url(service_name='delineatewatershed')
         payload = {'utmZone': utm_zone, 'streamThreshold': threshold, 'outletPointX': outlet_point_x,
-                   'outletPointY': outlet_point_y, "input_DEM_raster": input_raster_url_path}
+                   'outletPointY': outlet_point_y, "input_DEM_raster": input_raster_url_path,
+                   "output_raster": output_raster, 'output_outlet_shapefile': output_outlet_shapefile}
         response = self._make_data_service_request(url=url, params=payload)
         return self._process_dataservice_response(response, save_as)
 
