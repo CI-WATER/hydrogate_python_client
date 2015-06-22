@@ -936,15 +936,41 @@ class HydroDS(object):
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
 
-    def project_netcdf(self, input_netcdf_url_path, utm_zone, variable_name, output_netcdf=None, save_as=None):
+    def project_netcdf(self, input_netcdf_url_path, utm_zone, variable_name, output_netcdf, save_as=None):
+        """
+        Project a netcdf file
+
+        :param input_netcdf_url_path: url file path for the netcdf file to be projected
+        :param utm_zone: UTM zone value to use for projection
+        :param variable_name: name of the data variable
+        :param output_netcdf: name for the output (projected) netcdf file
+        :param save_as: file name and file path to save the projected netcdf file locally
+        :return: a dictionary with key 'output_netcdf' and value of url path for the projected netcdf file
+
+        :raises: HydroDSArgumentException: one or more argument failed validation at client side
+        :raises: HydroDSBadRequestException: one or more argument failed validation on the server side
+        :raises: HydroDSNotAuthenticatedException: provided user account failed validation
+        :raises: HydroDSNotAuthorizedException: user making this request is not authorized to do so
+        :raises: HydroDSNotFoundException: specified netcdf input file(s) does not exist on the server
+
+        Example usage:
+            hds = HydroDS(username=your_username, password=your_password)
+            input_netcdf_url_path = 'http://hydro-ds.uwrl.usu.edu:20199/files/data/user_2/subset_netcdf_to_spawn.nc'
+            hds_response_data = hds.project_netcdf(input_netcdf_url_path=input_netcdf_url_path, variable_name='prcp',
+                                                   utm_zone=12, output_netcdf='projected_prcp_spwan.nc')
+
+            # print the url path for the projected netcdf file
+            output_projected_netcdf_url = hds_response_data['output_netcdf']
+            print(output_projected_netcdf_url)
+        """
+
         if save_as:
             self._validate_file_save_as(save_as)
 
         url = self._get_dataservice_specific_url('projectnetcdf')
         payload = {"input_netcdf": input_netcdf_url_path, 'variable_name': variable_name, 'utm_zone': utm_zone}
-        if output_netcdf:
-            self._validate_output_netcdf_file_name(output_netcdf)
-            payload['output_netcdf'] = output_netcdf
+        self._validate_file_name(output_netcdf, ext='.nc')
+        payload['output_netcdf'] = output_netcdf
 
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
@@ -971,7 +997,7 @@ class HydroDS(object):
         :param input_netcdf1_url_path: url file path for the 1st netcdf file on HydroDS api server
         :param input_netcdf2_url_path: url file path for the 2nd netcdf file on HydroDS api server
         :param output_netcdf: name of the output (concatenated) netcdf file
-        :param save_as: (optional) netcdf file name and file path to save the generated concatenated netcdf file locally
+        :param save_as: netcdf file name and file path to save the generated concatenated netcdf file locally
         :return: a dictionary with key 'output_netcdf' and value of url path for the joined netcdf file
 
         :raises: HydroDSArgumentException: one or more argument failed validation at client side
