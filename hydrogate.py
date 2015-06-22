@@ -944,7 +944,7 @@ class HydroDS(object):
         :param utm_zone: UTM zone value to use for projection
         :param variable_name: name of the data variable
         :param output_netcdf: name for the output (projected) netcdf file
-        :param save_as: file name and file path to save the projected netcdf file locally
+        :param save_as: (optional) file name and file path to save the projected netcdf file locally
         :return: a dictionary with key 'output_netcdf' and value of url path for the projected netcdf file
 
         :raises: HydroDSArgumentException: one or more argument failed validation at client side
@@ -997,7 +997,7 @@ class HydroDS(object):
         :param input_netcdf1_url_path: url file path for the 1st netcdf file on HydroDS api server
         :param input_netcdf2_url_path: url file path for the 2nd netcdf file on HydroDS api server
         :param output_netcdf: name of the output (concatenated) netcdf file
-        :param save_as: netcdf file name and file path to save the generated concatenated netcdf file locally
+        :param save_as: (optional) file name and file path to save the generated concatenated netcdf file locally
         :return: a dictionary with key 'output_netcdf' and value of url path for the joined netcdf file
 
         :raises: HydroDSArgumentException: one or more argument failed validation at client side
@@ -1029,15 +1029,38 @@ class HydroDS(object):
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
 
-    def project_raster_to_UTM_NAD83(self, input_raster_url_path, utm_zone, output_raster=None, save_as=None):
+    def project_raster_to_UTM_NAD83(self, input_raster_url_path, utm_zone, output_raster, save_as=None):
+        """
+        Project a raster to UTM NAD83 projection
+
+        :param input_raster_url_path: url file path for the user owned raster to be projected
+        :param utm_zone: UTM zone value to be used for projection
+        :param output_raster: name for the output (projected) raster file
+        :param save_as: (optional) raster file name and file path to save the projected raster file locally
+        :return: a dictionary with key 'output_raster' and value of url path for the projected raster file
+
+        :raises: HydroDSArgumentException: one or more argument failed validation at client side
+        :raises: HydroDSBadRequestException: one or more argument failed validation on the server side
+        :raises: HydroDSNotAuthenticatedException: provided user account failed validation
+        :raises: HydroDSNotAuthorizedException: user making this request is not authorized to do so
+        :raises: HydroDSNotFoundException: specified raster input file(s) does not exist on the server
+
+        Example usage:
+            hds = HydroDS(username=your_username, password=your_password)
+            hds_response_data = hds.project_raster_to_UTM_NAD83(input_raster_url_path='url_raster_file_path',
+                                                                utm_zone=12, output_raster='projected_raster.tif')
+
+            # print url path of the projected raster file
+            output_projected_raster_url = hds_response_data['output_raster']
+            print(output_projected_raster_url)
+        """
         if save_as:
             self._validate_file_save_as(save_as)
 
         url = self._get_dataservice_specific_url('projectraster')
         payload = {"input_raster": input_raster_url_path, 'utmZone': utm_zone}
-        if output_raster:
-            self._validate_output_raster_file_name(output_raster)
-            payload['output_raster'] = output_raster
+        self._validate_output_raster_file_name(output_raster)
+        payload['output_raster'] = output_raster
 
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
