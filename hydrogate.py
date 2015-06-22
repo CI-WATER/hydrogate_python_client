@@ -1072,7 +1072,7 @@ class HydroDS(object):
 
         # URL: http://129.123.41.184:20199/api/dataservice/projectshapefile?utm_zone=12&input_shape_file=http://129.123.41.184:20199/files/data/user_2/outlet.zip
 
-        url = self._get_dataservice_specific_url('projectshapefile')
+        url = self._get_dataservice_specific_url('projectshapefileutm')
         payload = {"input_shape_file": input_shapefile_url_path, 'utm_zone': utm_zone}
         if output_shape_file:
             err_msg = "Invalid output file name:{file_name}".format(file_name=output_shape_file)
@@ -1122,21 +1122,23 @@ class HydroDS(object):
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
 
-    # TODO: This method needs to be tested (6/19/2015)
-    def delineate_watershed(self, input_raster_url_path, outlet_point_x, outlet_point_y, utm_zone, threshold,
-                            output_raster, output_outlet_shapefile, save_as=None):
+    def delineate_watershed(self, input_raster_url_path, threshold, output_raster, output_outlet_shapefile,
+                            epsg_code, outlet_point_x=None, outlet_point_y=None,
+                            input_outlet_shapefile_url_path=None, save_as=None):
         """
         Delineate watershed
 
         :param input_raster_url_path: url file path for the raster file for which to delineate watershed
-        :param outlet_point_x: X-coordinate of the outlet point
-        :param outlet_point_y: Y-coordinate of the outlet point
-        :param utm_zone: utm zone value to be used
         :param threshold: threshold value to be used
         :param: output_raster: file name for the delineated watershed raster file
+        :param: output_outlet_shapefile: name for the outlet shapefile
+        :param outlet_point_x: X-coordinate of the outlet point (required if not using input_outlet_shapefile_url_path)
+        :param outlet_point_y: Y-coordinate of the outlet point (required if not using input_outlet_shapefile_url_path)
+        :param input_outlet_shapefile_url_path: url file path for the outlet shape file to be used for outlet location
+        :param epsg_code: EPSG code to use for delineation
         :param save_as: (optional) raster file name and file path to save the delineated watershed raster file locally
         :return:a dictionary with key 'output_raster' and value of url path for the watershed raster file, and
-        key 'output_outlet_shapefile' and value of url path for the outlet shapefile
+                key 'output_outlet_shapefile' and value of url path for the outlet shapefile
 
         :raises: HydroDSArgumentException: one or more argument failed validation at client side
         :raises: HydroDSBadRequestException: one or more argument failed validation on the server side
@@ -1146,15 +1148,32 @@ class HydroDS(object):
 
         Example usage:
             hds = HydroDS(username=your_username, password=your_password)
+            # using outlet point location
             hds_response_data = hds.delineate_watershed(input_raster_url_path=raster_url,
                                                         outlet_point_x=111.787,
                                                         outlet_point_y=41.742,
-                                                        utm_zone=12,
+                                                        epsg_code=2152,
                                                         threshold=60000,
                                                         output_raster='logan_watershed.tif',
                                                         output_outlet_shapefile='logan_outlet.shp',
                                                         save_as=r'C:\hydro-ds\delineated_ws.tif')
 
+            # print url path of the delineated watershed raster file
+            output_delineated_raster_url = hds_response_data['output_raster']
+            print(output_delineated_raster_url)
+
+            # print the url path of the outlet shapefile
+            output_outlet_shapefile_url = hds_response_data['output_outlet_shapefile']
+            print(output_outlet_shapefile_url)
+
+            # using outlet shape file
+            hds_response_data = hds.delineate_watershed(input_raster_url_path=raster_url,
+                                                        input_outlet_shapefile_url_path=outlet_shapefile_url,
+                                                        epsg_code=2152,
+                                                        threshold=60000,
+                                                        output_raster='logan_watershed.tif',
+                                                        output_outlet_shapefile='logan_outlet.shp',
+                                                        save_as=r'C:\hydro-ds\delineated_ws.tif')
             # print url path of the delineated watershed raster file
             output_delineated_raster_url = hds_response_data['output_raster']
             print(output_delineated_raster_url)
@@ -1171,10 +1190,28 @@ class HydroDS(object):
         if not self._validate_file_name(output_outlet_shapefile, ext='.shp'):
             raise HydroDSArgumentException("{file_name} is not a valid shapefile name".format(file_name=output_outlet_shapefile))
 
-        url = self._get_dataservice_specific_url(service_name='delineatewatershed')
-        payload = {'utmZone': utm_zone, 'streamThreshold': threshold, 'outletPointX': outlet_point_x,
-                   'outletPointY': outlet_point_y, "input_DEM_raster": input_raster_url_path,
-                   "output_raster": output_raster, 'output_outlet_shapefile': output_outlet_shapefile}
+        try:
+            int(epsg_code)
+        except TypeError:
+            raise HydroDSArgumentException("A value for epsg_code must be an integer")
+
+        if input_outlet_shapefile_url_path is None:
+            if outlet_point_x is None:
+                raise HydroDSArgumentException("A value for outlet_point_x is missing")
+            if outlet_point_y is None:
+                raise HydroDSArgumentException("A value for outlet_point_y is missing")
+
+        if input_outlet_shapefile_url_path:
+            url = self._get_dataservice_specific_url(service_name='delineatewatershedatshapefile')
+            payload = {'streamThreshold': threshold, 'input_DEM_raster': input_raster_url_path,
+                       'input_outlet_shapefile': input_outlet_shapefile_url_path,'epsgCode': epsg_code,
+                       'output_raster': output_raster, 'output_outlet_shapefile': output_outlet_shapefile}
+        else:
+            url = self._get_dataservice_specific_url(service_name='delineatewatershed')
+            payload = {'epsgCode': epsg_code, 'streamThreshold': threshold, 'outletPointX': outlet_point_x,
+                       'outletPointY': outlet_point_y, "input_DEM_raster": input_raster_url_path,
+                       "output_raster": output_raster, 'output_outlet_shapefile': output_outlet_shapefile}
+
         response = self._make_data_service_request(url=url, params=payload)
         return self._process_dataservice_response(response, save_as)
 
