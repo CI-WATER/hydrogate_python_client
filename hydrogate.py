@@ -594,15 +594,43 @@ class HydroDS(object):
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
 
-    def project_clip_raster(self, input_raster, ref_raster_url_path, output_raster=None, save_as=None):
+    def project_clip_raster(self, input_raster, ref_raster_url_path, output_raster, save_as=None):
+        """
+        Project and clip a raster based on a reference raster
+
+        :param input_raster: raster to be projected and clipped (just the file name if this data is supported by
+                             HydroDS otherwise, url file path)
+        :param ref_raster_url_path: url path of the raster to be used as the reference for projection and clipping
+        :param output_raster: name for the output raster
+        :param save_as: (optional) file name and file path to save the generated raster file locally
+        :return: a dictionary with key 'output_raster' and value of url path for the generated raster file
+
+        :raises: HydroDSArgumentException: one or more argument failed validation at client side
+        :raises: HydroDSBadRequestException: one or more argument failed validation on the server side
+        :raises: HydroDSNotAuthenticatedException: provided user account failed validation
+        :raises: HydroDSNotAuthorizedException: user making this request is not authorized to do so
+        :raises: HydroDSNotFoundException: specified raster input file(s) does not exist on the server
+
+        Example usage:
+            hds = HydroDS(username=your_username, password=your_password)
+            ref_input_raster_url = 'http://hydro-ds-uwrl.usu.edu:20199/files/data/user_2/SpawnProj.tif'
+            input_raster = 'nlcd2011CONUS.tif'  # this a static data file on the HydroDS server
+            hds_response_data =  hds.project_clip_raster(input_raster=input_raster,
+                                                         ref_raster_url_path=ref_input_raster_url,
+                                                         output_raster='nlcd_proj_spwan.tif')
+
+            # print url path of the projected/clipped raster file
+            output_raster_url = hds_response_data['output_raster']
+            print(output_raster_url)
+        """
+
         if save_as:
             self._validate_file_save_as(save_as)
 
         url = self._get_dataservice_specific_url('projectandcliprastertoreference')
         payload = {"input_raster": input_raster, 'reference_raster': ref_raster_url_path}
-        if output_raster:
-            self._validate_output_raster_file_name(output_raster)
-            payload['output_raster'] = output_raster
+        self._validate_file_name(output_raster, ext='.tif')
+        payload['output_raster'] = output_raster
 
         response = self._make_data_service_request(url=url, params=payload)
         return self._process_dataservice_response(response, save_as)
