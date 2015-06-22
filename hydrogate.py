@@ -443,7 +443,8 @@ class HydroDS(object):
         :param top: y-coordinate of the left-top corner of the bounding box
         :param right: x-coordinate of the right-bottom corner of the bounding box
         :param bottom: y-coordinate of the right-bottom corner of the bounding box
-        :param input_raster: raster from which the subset to be created. It can be either the name of the static DEM file or url path for the user DEM file
+        :param input_raster: raster from which the subset to be created. It can be either the name of the static DEM
+                             file or url path for the user DEM file
         :param save_as: (optional) subset dem tif file to save as (file name with path)
         :return: an object of type ServiceRequest
 
