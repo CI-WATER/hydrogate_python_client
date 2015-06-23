@@ -436,7 +436,7 @@ class HydroDS(object):
         response = self._make_data_service_request(url=url)
         return self._process_dataservice_response(response, save_as=None)
 
-    def subset_raster(self, left, top, right, bottom, input_raster, output_raster=None, save_as=None):
+    def subset_raster(self, left, top, right, bottom, input_raster, output_raster, save_as=None):
         """
         Subsets a dem (dem tif file on the file server) and creates a new tif file with the subset data
         :param left: x-coordinate of the left-top corner of the bounding box
@@ -458,11 +458,12 @@ class HydroDS(object):
         if save_as:
             self._validate_file_save_as(save_as)
 
+        self._validate_boundary_box(bottom, left, right, top)
+
         #payload = {'bbox': str(left) + ' ' + str(top) + ' ' + str(right) + ' ' + str(bottom)}
         payload = {'xmin': left, 'ymin': bottom, 'xmax': right, 'ymax': top, 'input_raster': input_raster}
-        if output_raster:
-            self._validate_output_raster_file_name(output_raster)
-            payload['output_raster'] = output_raster
+        self._validate_file_name(output_raster, ext='tif')
+        payload['output_raster'] = output_raster
 
         response = self._make_data_service_request(url=url, params=payload)
         return self._process_dataservice_response(response, save_as)
@@ -1310,6 +1311,42 @@ class HydroDS(object):
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
 
+    def subset_project_resample_raster(self, input_raster, left, top, right, bottom, cell_size_dx,
+                                       cell_size_dy, output_raster, epsg_code=None, resample=None,  save_as=None):
+        if save_as:
+            self._validate_file_save_as(save_as)
+
+        if not self._validate_file_name(output_raster, ext='.tif'):
+            raise HydroDSArgumentException('{file_name} is not a valid raster file '
+                                           'name.'.format(file_name=output_raster))
+
+        self._validate_boundary_box(bottom, left, right, top)
+
+        if not isinstance(cell_size_dx, int):
+            raise HydroDSArgumentException("cell_size_dx value must be an integer")
+
+        if not isinstance(cell_size_dy, int):
+            raise HydroDSArgumentException("cell_size_dy value must be an integer")
+
+        payload = {"input_raster": input_raster, 'xmin': left, 'ymin': bottom, 'xmax': right, 'ymax': top,
+                   'dx': cell_size_dx, 'dy': cell_size_dy, 'output_raster': output_raster}
+
+        if epsg_code:
+            if not isinstance(epsg_code, int):
+                raise HydroDSArgumentException("epsg_code value must be an integer")
+            payload['epsg_code'] = epsg_code
+            url = self._get_dataservice_specific_url('subsetprojectresamplerasterepsg')
+        else:
+            url = self._get_dataservice_specific_url('subsetprojectresamplerasterutm')
+
+        if resample:
+            resample = resample.lower()
+            self._validate_resample_input(resample)
+            payload['resample'] = resample
+
+        response = self._make_data_service_request(url, params=payload)
+        return self._process_dataservice_response(response, save_as)
+
     def resample_netcdf(self, input_netcdf_url_path, ref_netcdf_url_path, variable_name, output_netcdf=None,
                         save_as=None):
         """
@@ -1466,6 +1503,16 @@ class HydroDS(object):
                            'med', 'q1', 'q3')
         if resample not in allowed_options:
             raise HydroDSArgumentException("{rsample} is not a valid GDAL resampling method".format(resample=resample))
+
+    def _validate_boundary_box(self, bottom, left, right, top):
+        if not isinstance(left, float):
+            raise HydroDSArgumentException("left value must be a decimal number")
+        if not isinstance(top, float):
+            raise HydroDSArgumentException("top value must be a decimal number")
+        if not isinstance(right, float):
+            raise HydroDSArgumentException("right value must be a decimal number")
+        if not isinstance(bottom, float):
+            raise HydroDSArgumentException("bottom value must be a decimal number")
 
     def _make_data_service_request(self, url, http_method='GET', params=None, data=None, files=None):
         if http_method == 'GET':
