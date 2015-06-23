@@ -1066,19 +1066,41 @@ class HydroDS(object):
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
 
-    def project_shapefile_to_UTM_NAD83(self, input_shapefile_url_path, utm_zone, output_shape_file=None, save_as=None):
+    def project_shapefile(self, input_shapefile_url_path, output_shape_file, utm_zone=None, epsg_code=None,
+                          save_as=None):
         if save_as:
             self._validate_file_save_as(save_as)
 
         # URL: http://129.123.41.184:20199/api/dataservice/projectshapefile?utm_zone=12&input_shape_file=http://129.123.41.184:20199/files/data/user_2/outlet.zip
 
-        url = self._get_dataservice_specific_url('projectshapefileutm')
-        payload = {"input_shape_file": input_shapefile_url_path, 'utm_zone': utm_zone}
-        if output_shape_file:
-            err_msg = "Invalid output file name:{file_name}".format(file_name=output_shape_file)
-            if len(output_shape_file.strip()) < 5 or not output_shape_file.endswith('.shp'):
-                raise ValueError(err_msg)
-            payload['output_shape_file'] = output_shape_file
+        if utm_zone is None and epsg_code is None:
+            raise HydroDSArgumentException("A value for either utm_zone or epsg_code is required")
+
+        if utm_zone and epsg_code:
+            raise HydroDSArgumentException("A value for either utm_zone or epsg_code is needed and not both")
+
+        if not self._validate_file_name(output_shape_file, ext='.shp'):
+            raise HydroDSArgumentException('{file_name} is not a valid shapefile '
+                                           'name.'.format(file_name=output_shape_file))
+
+        payload = {"input_shape_file": input_shapefile_url_path, 'output_shape_file': output_shape_file}
+        url = None
+        if utm_zone:
+            if not isinstance(utm_zone, int):
+                raise HydroDSArgumentException("utm_zone value must be an integer")
+            payload['utm_zone'] = utm_zone
+            url = self._get_dataservice_specific_url('projectshapefileutm')
+
+        if epsg_code:
+            if not isinstance(epsg_code, int):
+                raise HydroDSArgumentException("epsg_code value must be an integer")
+            payload['epsg_code'] = epsg_code
+            url = self._get_dataservice_specific_url('projectshapefileepsg')
+
+        # url = self._get_dataservice_specific_url('projectshapefileutm')
+        # payload = {"input_shape_file": input_shapefile_url_path, 'utm_zone': utm_zone}
+        #
+        # payload['output_shape_file'] = output_shape_file
 
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
