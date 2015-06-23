@@ -1247,11 +1247,65 @@ class HydroDS(object):
         url = self._get_dataservice_specific_url('resampleraster')
         payload = {"input_raster": input_raster_url_path, 'dx': cell_size_dx, 'dy': cell_size_dy}
         if resample:
+            resample = resample.lower()
+            self._validate_resample_input(resample)
             payload['resample'] = resample
 
         if output_raster:
             self._validate_output_raster_file_name(output_raster)
             payload['output_raster'] = output_raster
+
+        response = self._make_data_service_request(url, params=payload)
+        return self._process_dataservice_response(response, save_as)
+
+    def project_resample_raster(self, input_raster_url_path, cell_size_dx, cell_size_dy, output_raster, utm_zone=None,
+                                epsg_code=None, resample=None,  save_as=None):
+        if save_as:
+            self._validate_file_save_as(save_as)
+
+        # example: http://129.123.41.184:20199/api/dataservice/resampleraster?dx=50&dy=50&
+        # input_raster=http://129.123.41.184:20199/files/data/user_2/projected.tif
+        if utm_zone is None and epsg_code is None:
+            raise HydroDSArgumentException("A value for either utm_zone or epsg_code is required")
+
+        if utm_zone and epsg_code:
+            raise HydroDSArgumentException("A value for either utm_zone or epsg_code is needed and not both")
+
+        if not self._validate_file_name(output_raster, ext='.tif'):
+            raise HydroDSArgumentException('{file_name} is not a valid raster file '
+                                           'name.'.format(file_name=output_raster))
+
+        if not isinstance(cell_size_dx, int):
+            raise HydroDSArgumentException("cell_size_dx value must be an integer")
+
+        if not isinstance(cell_size_dy, int):
+            raise HydroDSArgumentException("cell_size_dy value must be an integer")
+
+        url = None
+        payload = {"input_raster": input_raster_url_path, 'dx': cell_size_dx, 'dy': cell_size_dy,
+                   'output_raster': output_raster}
+        if utm_zone:
+            if not isinstance(utm_zone, int):
+                raise HydroDSArgumentException("utm_zone value must be an integer")
+            payload['utm_zone'] = utm_zone
+            url = self._get_dataservice_specific_url('projectresamplerasterutm')
+
+        if epsg_code:
+            if not isinstance(epsg_code, int):
+                raise HydroDSArgumentException("epsg_code value must be an integer")
+            payload['epsg_code'] = epsg_code
+            url = self._get_dataservice_specific_url('projectresamplerasterepsg')
+
+        # url = self._get_dataservice_specific_url('resampleraster')
+        # payload = {"input_raster": input_raster_url_path, 'dx': cell_size_dx, 'dy': cell_size_dy}
+        if resample:
+            resample = resample.lower()
+            self._validate_resample_input(resample)
+            payload['resample'] = resample
+
+        # if output_raster:
+        #     self._validate_output_raster_file_name(output_raster)
+        #     payload['output_raster'] = output_raster
 
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
@@ -1406,6 +1460,12 @@ class HydroDS(object):
         err_msg = "Invalid output netcdf file name:{file_name}".format(file_name=file_name)
         if len(file_name.strip()) < 4 or not file_name.endswith('.nc'):
             raise HydroDSArgumentException(err_msg)
+
+    def _validate_resample_input(self, resample):
+        allowed_options = ('near', 'bilinear', 'cubic', 'cubicspline', 'lanczos', 'average', 'mode', 'max', 'min',
+                           'med', 'q1', 'q3')
+        if resample not in allowed_options:
+            raise HydroDSArgumentException("{rsample} is not a valid GDAL resampling method".format(resample=resample))
 
     def _make_data_service_request(self, url, http_method='GET', params=None, data=None, files=None):
         if http_method == 'GET':
