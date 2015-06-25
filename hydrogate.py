@@ -63,6 +63,7 @@ class HydroDS(object):
         self.password = password
         self.requests = requests
         self.authorization = (username, password)
+        self.hydroshare_auth = None
         # if self.username and self.password:
         #     self.requests.auth.HTTPBasicAuth(self.username, self.password)
         #     self.user_authenticated = True
@@ -1539,6 +1540,44 @@ class HydroDS(object):
         print("Downloaded file saved successfully at:%s" % save_as)
         print(service_req.to_json())
         return service_req
+
+    def set_hydroshare_account(self, username, password):
+        self.hydroshare_auth = (username, password)
+
+    def upload_to_hydroshare(self, file_url_path, local_download_directory, resource_type, title=None, abstract=None,
+                             keywords=None):
+
+        if not os.path.exists(local_download_directory):
+            raise HydroDSArgumentException("{download_dir} does not exist".format(download_dir=local_download_directory))
+
+        hs_url = 'http://www.hydroshare.org/hsapi/resource'
+        payload = {'resource_type': resource_type}
+        if title:
+            payload['title'] = title
+        if abstract:
+            payload['abstract'] = abstract
+
+        if keywords:
+            payload['keywords'] = keywords
+
+        # download the file from HydroDS
+        # get the file name from the url_file_path
+        file_name = file_url_path.split('/')[-1]
+        download_path = os.path.join(local_download_directory, file_name)
+        try:
+            self.download_file(file_url_path=file_url_path, save_as=download_path)
+        except Exception as ex:
+            raise HydroDSException("Failed to download the file from HydroDS.{message}".format(message=ex.message))
+        files = {'file': open(download_path, 'rb')}
+        # upload to HydroShare
+        response = self.requests.post(hs_url+'/?format=json', data=payload, files=files, auth=self.hydroshare_auth)
+
+        if response.ok:
+            response_content_dict = json.loads(response.content)
+            return response_content_dict
+        else:
+            raise HydroDSException("Failed to upload to HydroShare.{reason}".format(reason=response.reason))
+
 
     def _validate_output_raster_file_name(self, file_name):
         err_msg = "Invalid output raster file name:{file_name}".format(file_name=file_name)
