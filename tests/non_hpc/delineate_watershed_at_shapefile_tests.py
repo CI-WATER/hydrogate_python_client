@@ -24,13 +24,11 @@ response_data = hds.create_outlet_shapefile(point_x=-111.787, point_y=41.742, ou
 output_outlet_shapefile_url = response_data['output_shape_file_name']
 
 # project the outlet shapefile
-response_data = hds.project_shapefile_to_UTM_NAD83(input_shapefile_url_path=output_outlet_shapefile_url,
-                                                   utm_zone=12, output_shape_file='outlet_logan_proj.shp')
+response_data = hds.project_shapefile(input_shapefile_url_path=output_outlet_shapefile_url, utm_zone=12,
+                                      output_shape_file='outlet_logan_proj.shp')
 output_proj_outlet_shapefile_url = response_data['output_shape_file']
 
 try:
-    #output_proj_raster_url = "http://hydro-ds.uwrl.usu.edu:20199/files/data/user_2/projected_raster_logan_6.tif"
-    #output_proj_outlet_shapefile_url =  "http://hydro-ds.uwrl.usu.edu:20199/files/data/user_2/outlet_logan_proj.zip"
     response_data = hds.delineate_watershed(input_raster_url_path=output_proj_raster_url, threshold=60000,
                                             input_outlet_shapefile_url_path=output_proj_outlet_shapefile_url,
                                             epsg_code=2152,
