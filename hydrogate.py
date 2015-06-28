@@ -1721,9 +1721,32 @@ class HydroDS(object):
         return service_req
 
     def upload_file(self, file_to_upload):
-        if not os.path.isfile(file_to_upload):
-            raise Exception("Error: Specified file to upload (%s) does not exist." % file_to_upload)
+        """
+        Upload a file to HydroDS server
 
+        :param file_to_upload: file name and path for the file to upload
+        :type file_to_upload: string
+        :return: url of the uploaded file
+
+        :raises: HydroDSArgumentException: one or more argument failed validation at client side
+        :raises: HydroDSNotAuthenticatedException: provided user account failed validation
+        :raises: HydroDSNotAuthorizedException: user making this request is not authorized to do so
+
+        Example usage:
+            hds = HydroDS(username=your_username, password=your_password)
+            response_data = hds.upload_file(file_to_upload='E:\Scratch\param-test-pk.dat')
+            uploaded_file_url = response_data
+
+            # print the url path for the uploaded file
+            print(uploaded_file_url)
+        """
+
+        if not os.path.isfile(file_to_upload):
+            raise HydroDSArgumentException("Specified file to upload (%s) does not exist." % file_to_upload)
+
+        if not os.access(file_to_upload, os.R_OK):
+            raise HydroDSArgumentException("You don't have read access to the file (%s) to be uploaded."
+                                           % file_to_upload)
         url = self._get_dataservice_specific_url('myfiles/upload')
         with open(file_to_upload, 'rb') as upload_file_obj:
             response = self._make_data_service_request(url=url, http_method='POST', files={'file': upload_file_obj})
