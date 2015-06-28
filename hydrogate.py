@@ -540,18 +540,43 @@ class HydroDS(object):
         response = self._make_data_service_request(url=url, params=payload)
         return self._process_dataservice_response(response, save_as)
 
-    def raster_to_netcdf(self, input_raster_url_path, output_netcdf=None, save_as=None):
+    def raster_to_netcdf(self, input_raster_url_path, output_netcdf, save_as=None):
+        """
+        Generate a ntecdf file from a raster file (convert data in raster format to netcdf format)
+
+        :param input_raster_url_path: url file path for the user owned raster to be used for generating a netcdf file
+        :type input_raster_url_path: string
+        :param output_netcdf: name for the generated netcdf file
+        :type output_netcdf: string
+        :param save_as: (optional) file name and file path to save the generated netcdf file locally
+        :type save_as: string
+        :return: a dictionary with key 'output_netcdf' and value of url path for the generated netcdf file
+
+         :raises: HydroDSArgumentException: one or more argument failed validation at client side
+        :raises: HydroDSBadRequestException: one or more argument failed validation on the server side
+        :raises: HydroDSNotAuthenticatedException: provided user account failed validation
+        :raises: HydroDSNotAuthorizedException: user making this request is not authorized to do so
+        :raises: HydroDSNotFoundException: specified raster input file(s) does not exist on the server
+
+        Example usage:
+            hds = HydroDS(username=your_username, password=your_password)
+            response_data = hds.raster_to_netcdf(input_raster_url_path=provide_input_raster_url_here,
+                                                 output_netcdf='raster_to_netcdf.nc')
+            output_netcdf_url = response_data['output_netcdf']
+
+            # print the url path for the generated netcdf file
+            print(output_netcdf_url)
+        """
 
         if save_as:
             self._validate_file_save_as(save_as)
 
-        # Example: 129.123.41.184:20199/api/dataservice/rastertonetcdf?input_raster=http://129.123.41.184:20199/files/data/user_2/SpawnProj.tif
+        if not self._validate_file_name(output_netcdf, ext='.nc'):
+            raise HydroDSArgumentException('{file_name} is not a valid NetCDF file '
+                                           'name.'.format(file_name=output_netcdf))
 
         url = self._get_dataservice_specific_url('rastertonetcdf')
-        payload = {"input_raster": input_raster_url_path}
-        if output_netcdf:
-            self._validate_output_netcdf_file_name(output_netcdf)
-            payload['output_netcdf'] = output_netcdf
+        payload = {"input_raster": input_raster_url_path, 'output_netcdf': output_netcdf}
 
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
