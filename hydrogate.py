@@ -425,7 +425,7 @@ class HydroDS(object):
             # print name of the file that got deleted
             print(hds_response_data)
         """
-        if not self._validate_file_name(file_name):
+        if not self._is_file_name_valid(file_name):
             raise HydroDSArgumentException("{file_name} is not a valid file name".format(file_name=file_name))
 
         url = self._get_dataservice_specific_url('myfiles/delete/{file_name}'.format(file_name=file_name))
@@ -477,7 +477,7 @@ class HydroDS(object):
         if save_as:
             self._validate_file_save_as(save_as)
 
-        if not self._validate_file_name(output_raster, ext='.tif'):
+        if not self._is_file_name_valid(output_raster, ext='.tif'):
             raise HydroDSArgumentException('{file_name} is not a valid raster file '
                                            'name.'.format(file_name=output_raster))
 
@@ -512,7 +512,7 @@ class HydroDS(object):
             self._validate_file_save_as(save_as)
 
         self._validate_boundary_box(bottom, left, right, top)
-        if not self._validate_file_name(output_raster, ext='.tif'):
+        if not self._is_file_name_valid(output_raster, ext='.tif'):
             raise HydroDSArgumentException("{file_name} is not a valid raster file name".format(file_name=output_raster))
 
         payload = {'xmin': left, 'ymin': bottom, 'xmax': right, 'ymax': top, 'output_raster': output_raster}
@@ -591,7 +591,7 @@ class HydroDS(object):
         if save_as:
             self._validate_file_save_as(save_as)
 
-        if not self._validate_file_name(output_netcdf, ext='.nc'):
+        if not self._is_file_name_valid(output_netcdf, ext='.nc'):
             raise HydroDSArgumentException('{file_name} is not a valid NetCDF file '
                                            'name.'.format(file_name=output_netcdf))
 
@@ -664,7 +664,7 @@ class HydroDS(object):
 
         url = self._get_dataservice_specific_url(service_name)
         payload = {"input_raster": input_raster_url_path}
-        if not self._validate_file_name(output_raster, ext='.tif'):
+        if not self._is_file_name_valid(output_raster, ext='.tif'):
             err_msg = "Invalid output raster file name:{file_name}".format(file_name=output_raster)
             raise HydroDSArgumentException(err_msg)
 
@@ -708,7 +708,7 @@ class HydroDS(object):
 
         url = self._get_dataservice_specific_url('projectandcliprastertoreference')
         payload = {"input_raster": input_raster, 'reference_raster': ref_raster_url_path}
-        self._validate_file_name(output_raster, ext='.tif')
+        self._is_file_name_valid(output_raster, ext='.tif')
         payload['output_raster'] = output_raster
 
         response = self._make_data_service_request(url=url, params=payload)
@@ -762,7 +762,7 @@ class HydroDS(object):
 
         url = self._get_dataservice_specific_url('getcanopyvariable')
         payload = {"in_NLCDraster": input_NLCD_raster_url_path, 'variable_name': variable_name}
-        self._validate_file_name(output_netcdf, ext='.nc')
+        self._is_file_name_valid(output_netcdf, ext='.nc')
         payload['output_netcdf'] = output_netcdf
 
         response = self._make_data_service_request(url=url, params=payload)
@@ -944,7 +944,7 @@ class HydroDS(object):
         if output_variable_name:
             payload['output_varname'] = output_variable_name
 
-        if not self._validate_file_name(output_netcdf, ext='.nc'):
+        if not self._is_file_name_valid(output_netcdf, ext='.nc'):
             raise HydroDSArgumentException("{file_name} is not a valid netcdf file name".format(file_name=output_netcdf))
 
         payload['output_netcdf'] = output_netcdf
@@ -1055,7 +1055,7 @@ class HydroDS(object):
         if start_time_index > end_time_index:
             raise HydroDSArgumentException("start_time_index must be smaller than end_time_index")
 
-        if not self._validate_file_name(output_netcdf, ext='.nc'):
+        if not self._is_file_name_valid(output_netcdf, ext='.nc'):
             raise HydroDSArgumentException('{file_name} is not a valid NetCDF file '
                                            'name.'.format(file_name=output_netcdf))
 
@@ -1100,7 +1100,7 @@ class HydroDS(object):
 
         url = self._get_dataservice_specific_url('projectnetcdf')
         payload = {"input_netcdf": input_netcdf_url_path, 'variable_name': variable_name, 'utm_zone': utm_zone}
-        self._validate_file_name(output_netcdf, ext='.nc')
+        self._is_file_name_valid(output_netcdf, ext='.nc')
         payload['output_netcdf'] = output_netcdf
 
         response = self._make_data_service_request(url, params=payload)
@@ -1146,7 +1146,7 @@ class HydroDS(object):
         if save_as:
             self._validate_file_save_as(save_as)
 
-        if not self._validate_file_name(output_netcdf, ext='.nc'):
+        if not self._is_file_name_valid(output_netcdf, ext='.nc'):
             raise HydroDSArgumentException('{file_name} is not a valid NetCDF file '
                                            'name.'.format(file_name=output_netcdf))
 
@@ -1286,7 +1286,7 @@ class HydroDS(object):
         if utm_zone and epsg_code:
             raise HydroDSArgumentException("A value for either utm_zone or epsg_code is needed and not both")
 
-        if not self._validate_file_name(output_shape_file, ext='.shp'):
+        if not self._is_file_name_valid(output_shape_file, ext='.shp'):
             raise HydroDSArgumentException('{file_name} is not a valid shapefile '
                                            'name.'.format(file_name=output_shape_file))
 
@@ -1337,7 +1337,7 @@ class HydroDS(object):
 
         url = self._get_dataservice_specific_url(service_name='createoutletshapefile')
         payload = {"outletPointX": point_x, 'outletPointY': point_y}
-        if not self._validate_file_name(output_shape_file_name, ext='.shp'):
+        if not self._is_file_name_valid(output_shape_file_name, ext='.shp'):
             raise HydroDSArgumentException('{file_name} is not a valid shapefile '
                                            'name.'.format(file_name=output_shape_file_name))
 
@@ -1408,10 +1408,10 @@ class HydroDS(object):
         """
         if save_as:
             self._validate_file_save_as(save_as)
-        if not self._validate_file_name(output_raster, ext='.tif'):
+        if not self._is_file_name_valid(output_raster, ext='.tif'):
             raise HydroDSArgumentException("{file_name} is not a valid raster file name".format(file_name=output_raster))
 
-        if not self._validate_file_name(output_outlet_shapefile, ext='.shp'):
+        if not self._is_file_name_valid(output_outlet_shapefile, ext='.shp'):
             raise HydroDSArgumentException("{file_name} is not a valid shapefile name".format(file_name=output_outlet_shapefile))
 
         try:
@@ -1521,7 +1521,7 @@ class HydroDS(object):
         if utm_zone and epsg_code:
             raise HydroDSArgumentException("A value for either utm_zone or epsg_code is needed and not both")
 
-        if not self._validate_file_name(output_raster, ext='.tif'):
+        if not self._is_file_name_valid(output_raster, ext='.tif'):
             raise HydroDSArgumentException('{file_name} is not a valid raster file '
                                            'name.'.format(file_name=output_raster))
 
@@ -1621,7 +1621,7 @@ class HydroDS(object):
         if save_as:
             self._validate_file_save_as(save_as)
 
-        if not self._validate_file_name(output_raster, ext='.tif'):
+        if not self._is_file_name_valid(output_raster, ext='.tif'):
             raise HydroDSArgumentException('{file_name} is not a valid raster file '
                                            'name.'.format(file_name=output_raster))
 
@@ -1757,7 +1757,7 @@ class HydroDS(object):
         if type(files_to_zip) is not list:
             raise Exception("Error: Invalid parameter value:{param}. It should be a list.".format(param=files_to_zip))
 
-        if not self._validate_file_name(zip_file_name, ext='.zip'):
+        if not self._is_file_name_valid(zip_file_name, ext='.zip'):
             raise Exception('Error: {file_name} is not a valid zip file name.'.format(file_name=zip_file_name))
 
         file_names = ','.join(files_to_zip)
@@ -1933,7 +1933,7 @@ class HydroDS(object):
         _ServiceLog.delete_all()
         print ("Service call history deleted.")
 
-    def _validate_file_name(self, file_name, ext=None):
+    def _is_file_name_valid(self, file_name, ext=None):
         try:
             name_part, ext_part = os.path.splitext(file_name)
             if len(name_part) == 0 or len(ext_part) < 2:
@@ -1965,7 +1965,7 @@ class HydroDS(object):
             raise HydroDSArgumentException("You do not have write permissions to directory '{0}'.".format(save_file_dir))
 
         file_name = os.path.basename(save_as)
-        if not self._validate_file_name(file_name):
+        if not self._is_file_name_valid(file_name):
             raise HydroDSArgumentException("{file_name} is not a valid file name for saving the output "
                                            "file.".format(file_name=file_name))
 
