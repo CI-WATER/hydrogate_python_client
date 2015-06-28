@@ -1031,16 +1031,52 @@ class HydroDS(object):
         return self._process_dataservice_response(response, save_as)
 
     def project_subset_resample_netcdf(self, input_netcdf_url_path, ref_netcdf_url_path, variable_name,
-                                       output_netcdf=None, save_as=None):
+                                       output_netcdf, save_as=None):
+        """
+        Project, subset, and resample a netcdf file
+
+        :param input_netcdf_url_path: url file path for the user owned netcdf file to be projected, subsetted,
+                                      and resampled
+        :type input_netcdf_url_path: string
+        :param ref_netcdf_url_path: url file path for the user owned netcdf file to be used as the reference
+        :type ref_netcdf_url_path: string
+        :param variable_name:  name of the data variable in input netcdf to be used for projection and resampling
+        :type variable_name: string
+        :param output_netcdf: name for the output (projected/subsetted/resampled) netcdf file
+        :type output_netcdf: string
+        :param save_as: (optional) netcdf file name and file path to save the projected/subsetted/resampled netcdf file
+                        locally
+        :type save_as: string
+        :return: a dictionary with key 'output_netcdf' and value of url path for the generated netcdf file
+
+        :raises: HydroDSArgumentException: one or more argument failed validation at client side
+        :raises: HydroDSBadRequestException: one or more argument failed validation on the server side
+        :raises: HydroDSNotAuthenticatedException: provided user account failed validation
+        :raises: HydroDSNotAuthorizedException: user making this request is not authorized to do so
+        :raises: HydroDSNotFoundException: specified raster input file(s) does not exist on the server
+
+        Example usage:
+            hds = HydroDS(username=your_username, password=your_password)
+            response_data = hds.project_subset_resample_netcdf(input_netcdf_url_path=provide_input_netcdf_url_path_here,
+                                                               ref_netcdf_url_path=provide_ref_netcdf_url_path_here,
+                                                               variable_name='prcp',
+                                                               output_netcdf='proj_subset_resample_prcp_spwan.nc')
+            output_netcdf_url = response_data['output_netcdf']
+
+            # print the url path for the generated netcdf file
+            print(output_netcdf_url)
+        """
+
         if save_as:
             self._validate_file_save_as(save_as)
 
+        if not self._validate_file_name(output_netcdf, ext='.nc'):
+            raise HydroDSArgumentException('{file_name} is not a valid NetCDF file '
+                                           'name.'.format(file_name=output_netcdf))
+
         url = self._get_dataservice_specific_url('projectsubsetresamplenetcdftoreferencenetcdf')
         payload = {"input_netcdf": input_netcdf_url_path, 'reference_netcdf': ref_netcdf_url_path,
-                   'variable_name': variable_name}
-        if output_netcdf:
-            self._validate_output_netcdf_file_name(output_netcdf)
-            payload['output_netcdf'] = output_netcdf
+                   'variable_name': variable_name, 'output_netcdf': output_netcdf}
 
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
