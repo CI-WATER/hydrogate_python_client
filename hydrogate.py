@@ -997,7 +997,7 @@ class HydroDS(object):
 
         :param input_netcdf_url_path: url file path for the netcdf file to be projected
         :param utm_zone: UTM zone value to use for projection
-        :param variable_name: name of the data variable
+        :param variable_name: name of the data variable for which data to be projected
         :param output_netcdf: name for the output (projected) netcdf file
         :param save_as: (optional) file name and file path to save the projected netcdf file locally
         :return: a dictionary with key 'output_netcdf' and value of url path for the projected netcdf file
@@ -1314,11 +1314,59 @@ class HydroDS(object):
 
     def project_resample_raster(self, input_raster_url_path, cell_size_dx, cell_size_dy, output_raster, utm_zone=None,
                                 epsg_code=None, resample=None,  save_as=None):
+
+        """
+        Project and resample a raster
+
+        :param input_raster_url_path: url file path for the user owned raster to be projected and resampled
+        :type input_raster_url_path: string
+        :param cell_size_dx: cell width
+        :type cell_size_dx: integer
+        :param cell_size_dy:  cell height
+        :type cell_size_dy: integer
+        :param output_raster: name for the output (projected/resampled) raster file
+        :type output_raster: string
+        :param utm_zone:  UTM zone value to be used for projection (required if epsg_code is None)
+        :type utm_zone: integer
+        :param epsg_code: ESPG code value to be used for projection (required if utm_zone is None)
+        :type epsg_code: integer
+        :param resample: resample method (e.g., near, bilinear)
+        :type resample: string
+        :param save_as: (optional) raster file name and file path to save the projected/resampled raster file locally
+        :type save_as: string
+        :return: a dictionary with key 'output_raster' and value of url path for the projected raster file
+
+        :raises: HydroDSArgumentException: one or more argument failed validation at client side
+        :raises: HydroDSBadRequestException: one or more argument failed validation on the server side
+        :raises: HydroDSNotAuthenticatedException: provided user account failed validation
+        :raises: HydroDSNotAuthorizedException: user making this request is not authorized to do so
+        :raises: HydroDSNotFoundException: specified raster input file(s) does not exist on the server
+
+        Example usage:
+            hds = HydroDS(username=your_username, password=your_password)
+
+            # using UTM based projection
+            response_data = hds.project_resample_raster(input_raster_url_path='input_raster_url_path', cell_size_dx=100,
+                                                        cell_size_dy=100, utm_zone=12,
+                                                        output_raster='project_resample_utm.tif', resample='bilinear')
+            output_proj_resample_utm_raster_url = response_data['output_raster']
+
+            # print the url path for the generated raster file
+            print(output_proj_resample_utm_raster_url)
+
+            # using EPSG based projection
+            response_data = hds.project_resample_raster(input_raster_url_path='input_raster_url_path', cell_size_dx=100,
+                                                        cell_size_dy=100, epsg_code=2152,
+                                                        output_raster='project_resample_epsg.tif', resample='bilinear')
+            output_proj_resample_epsg_raster_url = response_data['output_raster']
+
+            # print the url path for the generated raster file
+            print(output_proj_resample_epsg_raster_url)
+
+        """
         if save_as:
             self._validate_file_save_as(save_as)
 
-        # example: http://129.123.41.184:20199/api/dataservice/resampleraster?dx=50&dy=50&
-        # input_raster=http://129.123.41.184:20199/files/data/user_2/projected.tif
         if utm_zone is None and epsg_code is None:
             raise HydroDSArgumentException("A value for either utm_zone or epsg_code is required")
 
@@ -1350,16 +1398,10 @@ class HydroDS(object):
             payload['epsg_code'] = epsg_code
             url = self._get_dataservice_specific_url('projectresamplerasterepsg')
 
-        # url = self._get_dataservice_specific_url('resampleraster')
-        # payload = {"input_raster": input_raster_url_path, 'dx': cell_size_dx, 'dy': cell_size_dy}
         if resample:
             resample = resample.lower()
             self._validate_resample_input(resample)
             payload['resample'] = resample
-
-        # if output_raster:
-        #     self._validate_output_raster_file_name(output_raster)
-        #     payload['output_raster'] = output_raster
 
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
@@ -1547,6 +1589,9 @@ class HydroDS(object):
     def upload_to_hydroshare(self, file_url_path, local_download_directory, resource_type, title=None, abstract=None,
                              keywords=None):
 
+        if not self.hydroshare_auth:
+            raise HydroDSNotAuthenticatedException("You do not have access to HydroShare. Set your access to HydroShare "
+                                                   "using the function set_hydroshare_account()")
         if not os.path.exists(local_download_directory):
             raise HydroDSArgumentException("{download_dir} does not exist".format(download_dir=local_download_directory))
 
@@ -1572,6 +1617,7 @@ class HydroDS(object):
         # upload to HydroShare
         response = self.requests.post(hs_url+'/?format=json', data=payload, files=files, auth=self.hydroshare_auth)
 
+        # TODO: delete the downloaded file
         if response.ok:
             response_content_dict = json.loads(response.content)
             return response_content_dict
@@ -1638,7 +1684,7 @@ class HydroDS(object):
             if save_as:
                 if len(response_dict['data']) != 1:
                     raise ValueError("Multiple output files found. Can't download multiple files.")
-                file_url = response_dict['data'].values()[0]
+                file_url = list(response_dict['data'].values())[0]
                 self.download_file(file_url, save_as)
             return response_dict['data']
         else:
