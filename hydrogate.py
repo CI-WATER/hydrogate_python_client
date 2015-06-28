@@ -984,11 +984,40 @@ class HydroDS(object):
         return self._process_dataservice_response(response, save_as)
 
     def subset_netcdf_by_time(self, input_netcdf_url_path, time_dimension_name, start_time_index, end_time_index,
-                              output_netcdf=None, save_as=None):
+                              output_netcdf, save_as=None):
+        """
+        Subset a netcdf file by time dimension
 
-        # URL: http://hostname/api/dataservice/subsetnetcdfbytime?input_netcdf=http://hostname/
-        # files/data/user_2/subset.nc&output_netcdf=subset_time_1_10.nc&time_dim_name=time&start_time_index=1
-        # &end_time_index=10
+        :param input_netcdf_url_path: url file path for the user owned netcdf file to be subsetted
+        :type input_netcdf_url_path: string
+        :param time_dimension_name: name of time dimension variable in the input netcdf file
+        :type time_dimension_name: string
+        :param start_time_index: start time for subsetting
+        :type start_time_index: integer
+        :param end_time_index: end time for subsetting
+        :type end_time_index: integer
+        :param output_netcdf: name for the output (subsetted) netcdf file
+        :type output_netcdf: string
+        :param save_as: (optional) netcdf file name and file path to save the subsetted netcdf file locally
+        :type save_as: string
+        :return: a dictionary with key 'output_netcdf' and value of url path for the generated netcdf file
+
+        :raises: HydroDSArgumentException: one or more argument failed validation at client side
+        :raises: HydroDSBadRequestException: one or more argument failed validation on the server side
+        :raises: HydroDSNotAuthenticatedException: provided user account failed validation
+        :raises: HydroDSNotAuthorizedException: user making this request is not authorized to do so
+        :raises: HydroDSNotFoundException: specified raster input file(s) does not exist on the server
+
+        Example usage:
+            hds = HydroDS(username=your_username, password=your_password)
+            response_data = hds.subset_netcdf_by_time(input_netcdf_url_path=your_input_netcdf_url_path_here,
+                                                      time_dimension_name='time', start_time_index=1, end_time_index=10,
+                                                      output_netcdf='subset_prcp_spwan_1_to_10_days.nc')
+            output_subset_netcdf_url = response_data['output_netcdf']
+
+            # print the url path for the generated netcdf file
+            print(output_subset_netcdf_url)
+        """
 
         if save_as:
             self._validate_file_save_as(save_as)
@@ -996,22 +1025,24 @@ class HydroDS(object):
         try:
             int(start_time_index)
         except TypeError:
-            raise ValueError("Value for start time index must be an integer")
+            raise HydroDSArgumentException("Value for start_time_index must be an integer")
 
         try:
             int(end_time_index)
         except TypeError:
-            raise ValueError("Value for start time index must be an integer")
+            raise HydroDSArgumentException("Value for end_time_index must be an integer")
 
         if start_time_index > end_time_index:
-            raise ValueError("Start time index must be smaller than end time index")
+            raise HydroDSArgumentException("start_time_index must be smaller than end_time_index")
+
+        if not self._validate_file_name(output_netcdf, ext='.nc'):
+            raise HydroDSArgumentException('{file_name} is not a valid NetCDF file '
+                                           'name.'.format(file_name=output_netcdf))
 
         url = self._get_dataservice_specific_url('subsetnetcdfbytime')
         payload = {"input_netcdf": input_netcdf_url_path, 'time_dim_name': time_dimension_name,
-                   'start_time_index': start_time_index, 'end_time_index': end_time_index}
-        if output_netcdf:
-            self._validate_output_netcdf_file_name(output_netcdf)
-            payload['output_netcdf'] = output_netcdf
+                   'start_time_index': start_time_index, 'end_time_index': end_time_index,
+                   'output_netcdf': output_netcdf}
 
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
