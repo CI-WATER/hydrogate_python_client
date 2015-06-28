@@ -865,20 +865,6 @@ class HydroDS(object):
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
 
-    def uncompress_raster(self, input_raster_url_path, save_as=None):
-        if save_as:
-            if not self._validate_file_save_as(save_as):
-                return
-
-        input_raster_name = self._get_file_name_from_url_file_path(input_raster_url_path)
-
-        # Example: http://129.123.41.158:8080/uncompressraster?raster=nedLogan.tif
-
-        url = self.dataservice_base_url + '/uncompressraster'
-        payload = {"raster": input_raster_name}
-        response = self.requests.get(url, params=payload)
-        return self._process_service_response(response, "uncompress_raster", save_as)
-
     def get_daymet_mosaic(self, start_year, end_year, save_as=None):
         if save_as:
             if not self._validate_file_save_as(save_as):
