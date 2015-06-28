@@ -545,17 +545,47 @@ class HydroDS(object):
         response = self.requests.get(url, params=payload)
         return self._process_service_response(response, 'generate_watershed_raster', save_as)
 
-    def subset_raster_to_reference(self, input_raster_url_path, ref_raster_url_path, output_raster=None, save_as=None):
-        #self._check_user_irods_authentication()
+    def subset_raster_to_reference(self, input_raster_url_path, ref_raster_url_path, output_raster, save_as=None):
+        """
+        Subset raster data based on a reference raster data
+
+        :param input_raster_url_path: url file path for the user owned raster file (on the HydroDS server)
+                                      to subset from
+        :type input_raster_url_path: string
+        :param ref_raster_url_path: url file path for the user owned raster file (on the HydroDS server) to be used as
+                                    a reference for subsetting
+        :param output_raster: name for the output (subsetted) raster file
+        :param save_as: (optional) raster file name and file path to save the projected/resampled raster file locally
+        :type save_as: string
+        :return: a dictionary with key 'output_raster' and value of url path for the subset raster file
+
+        :raises: HydroDSArgumentException: one or more argument failed validation at client side
+        :raises: HydroDSBadRequestException: one or more argument failed validation on the server side
+        :raises: HydroDSNotAuthenticatedException: provided user account failed validation
+        :raises: HydroDSNotAuthorizedException: user making this request is not authorized to do so
+        :raises: HydroDSNotFoundException: specified raster input file(s) does not exist on the server
+
+        Example usage:
+            hds = HydroDS(username=your_username, password=your_password)
+            response_data = hds.subset_raster_to_reference(input_raster_url_path=your_input_raster_url_here,
+                                                           ref_raster_url_path=your_ref_input_raster_url_here,
+                                                           output_raster='subset_to_spawn.tif')
+            output_subset_raster_url = response_data['output_raster']
+
+            # print the url path for the generated netcdf file
+            print(output_subset_raster_url)
+        """
 
         if save_as:
             self._validate_file_save_as(save_as)
 
+        if not self._is_file_name_valid(output_raster, ext='.tif'):
+            raise HydroDSArgumentException('{file_name} is not a valid raster file '
+                                           'name.'.format(file_name=output_raster))
+
         url = self._get_dataservice_specific_url('subsetrastertoreference')
-        payload = {"input_raster": input_raster_url_path, 'reference_raster': ref_raster_url_path}
-        if output_raster:
-            self._validate_output_raster_file_name(output_raster)
-            payload['output_raster'] = output_raster
+        payload = {"input_raster": input_raster_url_path, 'reference_raster': ref_raster_url_path,
+                   'output_raster': output_raster}
 
         response = self._make_data_service_request(url=url, params=payload)
         return self._process_dataservice_response(response, save_as)
