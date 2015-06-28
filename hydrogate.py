@@ -439,32 +439,52 @@ class HydroDS(object):
 
     def subset_raster(self, left, top, right, bottom, input_raster, output_raster, save_as=None):
         """
-        Subsets a dem (dem tif file on the file server) and creates a new tif file with the subset data
+        Subset raster data
+
         :param left: x-coordinate of the left-top corner of the bounding box
+        :type left: float
         :param top: y-coordinate of the left-top corner of the bounding box
+        :type top: float
         :param right: x-coordinate of the right-bottom corner of the bounding box
+        :type right: float
         :param bottom: y-coordinate of the right-bottom corner of the bounding box
-        :param input_raster: raster from which the subset to be created. It can be either the name of the static DEM
-                             file or url path for the user DEM file
-        :param save_as: (optional) subset dem tif file to save as (file name with path)
-        :return: an object of type ServiceRequest
+        :type bottom: float
+        :param input_raster: raster file to subset from (this can either be a url path for the user file on the HydroDS
+                             server or name of a relevant supported data file on the HydroDS server)
+        :param output_raster: name for the output (subsetted) raster file
+        :type output_raster: string
+        :param save_as: (optional) file name and file path to save the subsetted raster file locally
+        :return: a dictionary with key 'output_raster' and value of url path for the generated raster file
 
-        example call format: http://129.123.41.184:20199/api/dataservice/rastersubset?xmin=-111.97&ymax=42.11&xmax=-111.35&ymin=41.66&input_raster=nedWesternUS.tif&output_raster=logan.tif
+        :raises: HydroDSArgumentException: one or more argument failed validation at client side
+        :raises: HydroDSBadRequestException: one or more argument failed validation on the server side
+        :raises: HydroDSNotAuthenticatedException: provided user account failed validation
+        :raises: HydroDSNotAuthorizedException: user making this request is not authorized to do so
+        :raises: HydroDSNotFoundException: specified raster input file(s) does not exist on the server
+
+        Example usage:
+            hds = HydroDS(username=your_username, password=your_password)
+            response_data = hds.subset_raster(left=-111.97, top=42.11, right=-111.35, bottom=41.66,
+                                              input_raster='nedWesternUS.tif', output_raster='subset_dem_logan.tif')
+
+            output_subset_dem_url = response_data['output_raster']
+
+            # print the url path for the generated raster file
+            print(output_subset_dem_url)
         """
-
-        #url = 'http://129.123.41.158:8080/subsetdem'
-        #self._check_user_irods_authentication()
 
         url = self._get_dataservice_specific_url(service_name='rastersubset')
         if save_as:
             self._validate_file_save_as(save_as)
 
+        if not self._validate_file_name(output_raster, ext='.tif'):
+            raise HydroDSArgumentException('{file_name} is not a valid raster file '
+                                           'name.'.format(file_name=output_raster))
+
         self._validate_boundary_box(bottom, left, right, top)
 
-        #payload = {'bbox': str(left) + ' ' + str(top) + ' ' + str(right) + ' ' + str(bottom)}
-        payload = {'xmin': left, 'ymin': bottom, 'xmax': right, 'ymax': top, 'input_raster': input_raster}
-        self._validate_file_name(output_raster, ext='tif')
-        payload['output_raster'] = output_raster
+        payload = {'xmin': left, 'ymin': bottom, 'xmax': right, 'ymax': top, 'input_raster': input_raster,
+                   'output_raster': output_raster}
 
         response = self._make_data_service_request(url=url, params=payload)
         return self._process_dataservice_response(response, save_as)
@@ -1541,13 +1561,13 @@ class HydroDS(object):
 
         :param input_raster: raster file to subset from (this can either be a url path for the user file on the HydroDS
                              server or name of a relevant supported data file on the HydroDS server)
-        :param left: left coordinate of the bounding box
+        :param left: x-coordinate of the left-top corner of the bounding box
         :type left: float
-        :param top: top coordinate of the bounding box
+        :param top: y-coordinate of the left-top corner of the bounding box
         :type top: float
-        :param right: top coordinate of the bounding box
+        :param right: x-coordinate of the right-bottom corner of the bounding box
         :type right: float
-        :param bottom: bottom coordinate of the bounding box
+        :param bottom: y-coordinate of the right-bottom corner of the bounding box
         :type bottom: float
         :param cell_size_dx: grid cell width
         :type cell_size_dx: integer
