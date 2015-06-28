@@ -1535,7 +1535,69 @@ class HydroDS(object):
         return self._process_dataservice_response(response, save_as)
 
     def subset_project_resample_raster(self, input_raster, left, top, right, bottom, cell_size_dx,
-                                       cell_size_dy, output_raster, epsg_code=None, resample=None,  save_as=None):
+                                       cell_size_dy, output_raster, resample='near', epsg_code=None, save_as=None):
+        """
+        Subset, project, and resample a raster file
+
+        :param input_raster: raster file to subset from (this can either be a url path for the user file on the HydroDS
+                             server or name of a relevant supported data file on the HydroDS server)
+        :param left: left coordinate of the bounding box
+        :type left: float
+        :param top: top coordinate of the bounding box
+        :type top: float
+        :param right: top coordinate of the bounding box
+        :type right: float
+        :param bottom: bottom coordinate of the bounding box
+        :type bottom: float
+        :param cell_size_dx: grid cell width
+        :type cell_size_dx: integer
+        :param cell_size_dy: grid cell height
+        :type cell_size_dy: integer
+        :param output_raster: name for the output (subsetted) raster file
+        :type output_raster: string
+        :param epsg_code: (optional) EPSG code value to be used for projection (if not provided, projection will be
+                          based on calculated UTM zone value)
+        :type epsg_code: integer
+        :param resample: (optional) resample method (e.g., near, bilinear) (default 'near')
+        :type resample: string
+        :param save_as: (optional) file name and file path to save the subsetted/projected/resampled raster file
+                        locally
+        :type save_as: string
+        :return: a dictionary with key 'output_raster' and value of url path for the generated raster file
+
+        :raises: HydroDSArgumentException: one or more argument failed validation at client side
+        :raises: HydroDSBadRequestException: one or more argument failed validation on the server side
+        :raises: HydroDSNotAuthenticatedException: provided user account failed validation
+        :raises: HydroDSNotAuthorizedException: user making this request is not authorized to do so
+        :raises: HydroDSNotFoundException: specified raster input file(s) does not exist on the server
+
+        Example usage:
+            hds = HydroDS(username=your_username, password=your_password)
+            input_raster = "nedWesternUS.tif"   #DEM of western USA (HydroDS supported data)
+
+            # using UTM based projection
+            response_data = hds.subset_project_resample_raster(input_raster=input_raster, left=-111.97, top=42.11,
+                                                               right=-111.35, bottom=41.66, cell_size_dx=100,
+                                                               cell_size_dy=100, resample='bilinear',
+                                                               output_raster='subset_project_resample_logan_utm.tif')
+
+            output_subset_proj_resample_utm_raster_url = response_data['output_raster']
+
+            # print the url path for the generated raster file
+            print(output_subset_proj_resample_utm_raster_url)
+
+            # using EPSG based projection
+            response_data = hds.subset_project_resample_raster(input_raster=input_raster,left=-111.97, top=42.11,
+                                                               right=-111.35, bottom=41.66, cell_size_dx=100,
+                                                               cell_size_dy=100, resample='bilinear', epsg_code=2152,
+                                                               output_raster='subset_project_resample_logan_epsg.tif')
+
+            output_subset_proj_resample_epsg_raster_url = response_data['output_raster']
+
+            # print the url path for the generated raster file
+            print(output_subset_proj_resample_epsg_raster_url)
+        """
+
         if save_as:
             self._validate_file_save_as(save_as)
 
@@ -1551,8 +1613,11 @@ class HydroDS(object):
         if not isinstance(cell_size_dy, int):
             raise HydroDSArgumentException("cell_size_dy value must be an integer")
 
+        resample = resample.lower()
+        self._validate_resample_input(resample)
+
         payload = {"input_raster": input_raster, 'xmin': left, 'ymin': bottom, 'xmax': right, 'ymax': top,
-                   'dx': cell_size_dx, 'dy': cell_size_dy, 'output_raster': output_raster}
+                   'dx': cell_size_dx, 'dy': cell_size_dy, 'output_raster': output_raster, 'resample': resample}
 
         if epsg_code:
             if not isinstance(epsg_code, int):
@@ -1561,11 +1626,6 @@ class HydroDS(object):
             url = self._get_dataservice_specific_url('subsetprojectresamplerasterepsg')
         else:
             url = self._get_dataservice_specific_url('subsetprojectresamplerasterutm')
-
-        if resample:
-            resample = resample.lower()
-            self._validate_resample_input(resample)
-            payload['resample'] = resample
 
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
