@@ -17,7 +17,7 @@ try:
     # param: title: is optional
     # param: abstract: is optional
     # param: keywords: is optional
-    response_data = hds.upload_to_hydroshare(file_url_path=file_to_upload_to_hydroshare_url_path,
+    response_data = hds.create_hydroshare_resource(file_url_path=file_to_upload_to_hydroshare_url_path,
                                              local_download_directory='E:\Scratch\HydroGateClientDemo',
                                              resource_type='GenericResource', title='Resource created from HydroDS')
     print(response_data)

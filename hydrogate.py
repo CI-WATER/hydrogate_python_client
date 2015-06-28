@@ -1833,15 +1833,52 @@ class HydroDS(object):
     def set_hydroshare_account(self, username, password):
         self.hydroshare_auth = (username, password)
 
-    def upload_to_hydroshare(self, file_url_path, local_download_directory, resource_type, title=None, abstract=None,
-                             keywords=None):
+    def create_hydroshare_resource(self, file_url_path, local_download_directory, resource_type, title=None,
+                                   abstract=None, keywords=None):
+        """
+        Make a user file on HydroDS as a new resource in HydroShare
+
+        :param file_url_path: url of the user file on the HydroDS server to be made a resource in HydroShare
+        :param local_download_directory: local directory path where the user file from HydroDS will be downloaded
+        :param resource_type: type of resource to be created in HydroShare
+        :param title: title of the new resource to be created in HydroShare
+        :param abstract: abstract of the new resource to be created in HydroShare
+        :param keywords: keywords for the new resource to be created in HydroShare
+        :return: a dictionary with keys ('resource_id', 'resource_type') that has value for resource id and resource
+                 type of the HydroShare resource
+
+        :raises: HydroDSArgumentException: one or more argument failed validation at client side
+        :raises: HydroDSBadRequestException: one or more argument failed validation on the server side
+        :raises: HydroDSNotAuthenticatedException: provided user account failed validation
+        :raises: HydroDSNotAuthorizedException: user making this request is not authorized to do so
+        :raises: HydroDSNotFoundException: specified file url path failed to resolve
+
+        Example usage:
+            hds = HydroDS(username=your_username, password=your_password)
+            # set hydroshare user account
+            hds.set_hydroshare_account(username=your_hydroshare_username, password=your_hydroshare_password)
+            response_data = hds.create_hydroshare_resource(file_url_path=your_hydrods_file_url_here,
+                                                           local_download_directory='E:\Scratch\HydroGateClientDemo',
+                                                           resource_type='GenericResource',
+                                                           title='Resource created from HydroDS',
+                                                           abstract='Testing resource creation from HydroDS',
+                                                           keywords=['HydroDS', 'HydroShare'])
+            # print id of the resource created in HydroShare
+            print(response_data['resource_id'])
+
+            # print type of of the resource created in HydroShare
+            print(response_data['resource_type'])
+        """
 
         if not self.hydroshare_auth:
-            raise HydroDSNotAuthenticatedException("You do not have access to HydroShare. Set your access to HydroShare "
+            raise HydroDSNotAuthenticatedException("You don't have access to HydroShare. Set your access to HydroShare "
                                                    "using the function set_hydroshare_account()")
         if not os.path.exists(local_download_directory):
             raise HydroDSArgumentException("{download_dir} does not exist".format(download_dir=local_download_directory))
 
+        if not os.access(local_download_directory, os.W_OK):
+            raise HydroDSArgumentException("You don't have write permission to the specified directory (%s)."
+                                           % local_download_directory)
         hs_url = 'http://www.hydroshare.org/hsapi/resource'
         payload = {'resource_type': resource_type}
         if title:
@@ -1850,6 +1887,9 @@ class HydroDS(object):
             payload['abstract'] = abstract
 
         if keywords:
+            if not isinstance(keywords, list):
+                raise HydroDSArgumentException('keywords must be a list')
+            keywords = ','.join(keywords)
             payload['keywords'] = keywords
 
         # download the file from HydroDS
@@ -1861,7 +1901,7 @@ class HydroDS(object):
         except Exception as ex:
             raise HydroDSException("Failed to download the file from HydroDS.{message}".format(message=ex.message))
         files = {'file': open(download_path, 'rb')}
-        # upload to HydroShare
+        # create a resource in HydroShare
         response = self.requests.post(hs_url+'/?format=json', data=payload, files=files, auth=self.hydroshare_auth)
 
         # TODO: delete the downloaded file
@@ -1869,8 +1909,8 @@ class HydroDS(object):
             response_content_dict = json.loads(response.content)
             return response_content_dict
         else:
-            raise HydroDSException("Failed to upload to HydroShare.{reason}".format(reason=response.reason))
-
+            # TODO: generate more specific exception based on the specific response status code
+            raise HydroDSException("Failed to create a resource in HydroShare.{reason}".format(reason=response.reason))
 
     def _validate_output_raster_file_name(self, file_name):
         err_msg = "Invalid output raster file name:{file_name}".format(file_name=file_name)
