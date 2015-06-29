@@ -1788,16 +1788,41 @@ class HydroDS(object):
                     break
                 file_obj.write(block)
 
-
     def zip_files(self, files_to_zip, zip_file_name, save_as=None):
-        # validate parameters
+        """
+        Create a zip file from a list of user files on HydroDS
+
+        :param files_to_zip: a list of user file names on the HydroDS which need to be zipped
+        :type files_to_zip: a list
+        :param zip_file_name: name of output the zip file
+        :type zip_file_name: string
+        :param save_as: (optional) file name and file path to save the zipped file locally
+        :type save_as: string
+        :return: a dictionary with key of 'zip_file_name' and value of url file path the zip file
+
+        :raises: HydroDSArgumentException: one or more argument failed validation at client side
+        :raises: HydroDSBadRequestException: one or more argument failed validation on the server side
+        :raises: HydroDSNotAuthenticatedException: provided user account failed validation
+        :raises: HydroDSNotFoundException: specified input file(s) does not exist on HydroDS
+
+        Example usage:
+            hds = HydroDS(username=your_username, password=your_password)
+            files_to_zip = ['subset.nc', 'projected.tif']
+            response_data = hds.zip_files(files_to_zip=files_to_zip, zip_file_name='test_zipping.zip')
+            output_zip_file_url = response_data['zip_file_name']
+
+            # print the url path for the generated zip file
+            print(output_zip_file_url)
+        """
+
         if save_as:
             self._validate_file_save_as(save_as)
+
         if type(files_to_zip) is not list:
-            raise Exception("Error: Invalid parameter value:{param}. It should be a list.".format(param=files_to_zip))
+            raise HydroDSArgumentException("The value for the parameter files_to_zip must be a list")
 
         if not self._is_file_name_valid(zip_file_name, ext='.zip'):
-            raise Exception('Error: {file_name} is not a valid zip file name.'.format(file_name=zip_file_name))
+            raise HydroDSArgumentException('{file_name} is not a valid zip file name.'.format(file_name=zip_file_name))
 
         file_names = ','.join(files_to_zip)
         url = self._get_dataservice_specific_url('myfiles/zip')
