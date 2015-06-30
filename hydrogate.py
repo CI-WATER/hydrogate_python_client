@@ -339,6 +339,11 @@ class HydroDS(object):
                 job_def['walltime'] = '00:00:50'
                 job_def['outputlist'] = ['fel*.tif']
                 job_def['parameters'] = {'z': input_raster_file_name, 'fel': 'feloutput.tif'}
+            elif program_name == 'ueb':
+                job_def['program'] = 'ueb'
+                job_def['walltime'] = '00:59:50'
+                job_def['outputlist'] = ['SWE.nc', 'aggout.nc', 'SWIT.nc', 'SWISM.nc']
+                job_def['parameters'] = {'wdir': './', 'control': 'control.dat'}
             else:
                 raise Exception("Program parameters are missing for '%s'." % program_name)
 
@@ -1690,6 +1695,61 @@ class HydroDS(object):
         if output_netcdf:
             self._validate_output_netcdf_file_name(output_netcdf)
             payload['output_netcdf'] = output_netcdf
+
+        response = self._make_data_service_request(url, params=payload)
+        return self._process_dataservice_response(response, save_as)
+
+    def convert_netcdf_units(self, input_netcdf_url_path, output_netcdf, variable_name, variable_new_units=' ',
+                             multiplier_factor=1, offset=0, save_as=None):
+        """
+        Convert netcdf data to a specified unit, A new netcdf file is generated with the converted data
+
+        :param input_netcdf_url_path: url file path of netcdf file on HydroDS server for which variable units need to
+                                      be changed
+        :type input_netcdf_url_path: string
+        :param output_netcdf: name for the output netcdf file with variable data in converted units
+        :type output_netcdf: string
+        :param  variable_name: name of the variable in the input netcdf for which units to be converted
+        :type variable_name: string
+        :param variable_new_units: (optional) name for the converted unit
+        :type variable_new_units: string
+        :param multiplier_factor: (optional) factor by which the units to be converted (default is 1)
+        :type multiplier_factor: integer
+        :param offset: (optional) additive factor (default is 0)
+        :param save_as: (optional) file name and file path to save the generated netcdf file locally
+        :return: a dictionary with key 'output_netcdf' and value of url path for the output netcdf file
+
+        :raises: HydroDSArgumentException: one or more argument failed validation at client side
+        :raises: HydroDSBadRequestException: one or more argument failed validation on the server side
+        :raises: HydroDSNotAuthenticatedException: provided user account failed validation
+        :raises: HydroDSNotAuthorizedException: user making this request is not authorized to do so
+        :raises: HydroDSNotFoundException: specified netcdf input file doesn't exist on HydroDS server
+
+        Example usage:
+            hds = HydroDS(username=your_username, password=your_password)
+            input_netcdf_url_path = 'http://hydro-ds.uwrl.usu.edu:20199/files/data/user_2/subset_netcdf_to_spawn.nc'
+            try:
+                response_data = hds.convert_netcdf_units(input_netcdf_url_path=input_netcdf_url_path,
+                                                         output_netcdf='converted_units_spwan.nc',
+                                                         variable_name='prcp', variable_new_units="m/hr",
+                                                         multiplier_factor=0.00004167, offset=0)
+
+                output_netcdf_url = response_data['output_netcdf']
+
+                # print the url path for the generated netcdf file
+                print(output_netcdf_url)
+        """
+
+        if save_as:
+            self._validate_file_save_as(save_as)
+
+        if not self._is_file_name_valid(output_netcdf, ext='.nc'):
+            raise HydroDSArgumentException("{file_name} is not a valid netcdf file".format(file_name=output_netcdf))
+
+        url = self._get_dataservice_specific_url('convertnetcdfunits')
+        payload = {"input_netcdf": input_netcdf_url_path, 'output_netcdf': output_netcdf,
+                   'variable_name': variable_name, 'variable_new_units': variable_new_units,
+                   'multiplier_factor': multiplier_factor, 'offset': offset}
 
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
