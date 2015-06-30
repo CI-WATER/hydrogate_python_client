@@ -1931,7 +1931,68 @@ class HydroDS(object):
     def set_hydroshare_account(self, username, password):
         self.hydroshare_auth = (username, password)
 
-    def create_hydroshare_resource(self, file_url_path, local_download_directory, resource_type, title=None,
+    def create_hydroshare_resource(self, file_name, resource_type, title=None, abstract=None, keywords=None):
+        """
+        Make a user file on HydroDS as a new resource in HydroShare
+
+        :param file_url_path: url of the user file on the HydroDS server to be made a resource in HydroShare
+        :param local_download_directory: local directory path where the user file from HydroDS will be downloaded
+        :param resource_type: type of resource to be created in HydroShare
+        :param title: title of the new resource to be created in HydroShare
+        :param abstract: abstract of the new resource to be created in HydroShare
+        :param keywords: keywords for the new resource to be created in HydroShare
+        :return: a dictionary with keys ('resource_id', 'resource_type') that has value for resource id and resource
+                 type of the HydroShare resource
+
+        :raises: HydroDSArgumentException: one or more argument failed validation at client side
+        :raises: HydroDSBadRequestException: one or more argument failed validation on the server side
+        :raises: HydroDSNotAuthenticatedException: provided user account failed validation
+        :raises: HydroDSNotAuthorizedException: user making this request is not authorized to do so
+        :raises: HydroDSNotFoundException: specified file url path failed to resolve
+
+        Example usage:
+            hds = HydroDS(username=your_username, password=your_password)
+
+            # set hydroshare user account
+            hds.set_hydroshare_account(username=your_hydroshare_username, password=your_hydroshare_password)
+
+            # this a file you must own on HydroDS to make that as a new HydroShare resource
+            file_to_use_for_hydroshare_resource = 'logan_ws.tif'
+            response_data = hds.create_hydroshare_resource(file_name=file_to_use_for_hydroshare_resource,
+                                                   resource_type='GenericResource',
+                                                   title='Resource created from HydroDS by pk',
+                                                   abstract="Testing creation resource from HydroDS",
+                                                   keywords=['HydroShare', 'HydroDS'])
+
+            # print id of the resource created in HydroShare
+            print(response_data['resource_id'])
+
+            # print type of of the resource created in HydroShare
+            print(response_data['resource_type'])
+        """
+
+        if not self.hydroshare_auth:
+            raise HydroDSNotAuthenticatedException("You don't have access to HydroShare. Set your access to HydroShare "
+                                                   "using the function set_hydroshare_account()")
+
+        url = self._get_dataservice_specific_url('hydroshare/createresource')
+        payload = {'file_name': file_name, 'resource_type': resource_type, 'hs_username': self.hydroshare_auth[0],
+                   'hs_password': self.hydroshare_auth[1]}
+        if title:
+            payload['title'] = title
+        if abstract:
+            payload['abstract'] = abstract
+
+        if keywords:
+            if not isinstance(keywords, list):
+                raise HydroDSArgumentException('keywords must be a list')
+            keywords = ','.join(keywords)
+            payload['keywords'] = keywords
+
+        response = self._make_data_service_request(url, params=payload)
+        return self._process_dataservice_response(response, save_as=None)
+
+    def create_hydroshare_resource_old(self, file_url_path, local_download_directory, resource_type, title=None,
                                    abstract=None, keywords=None):
         """
         Make a user file on HydroDS as a new resource in HydroShare

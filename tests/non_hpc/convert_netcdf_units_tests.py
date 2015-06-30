@@ -10,7 +10,7 @@ hds = HydroDS(username=settings.USER_NAME, password=settings.PASSWORD)
 
 # NOTE: This a long running process
 # NOTE: the following url file paths are valid for user with id 2
-input_netcdf_url_path = 'http://hydro-ds.uwrl.usu.edu:20199/files/data/user_2/projected_prcp_spwan.nc'
+input_netcdf_url_path = 'http://hydro-ds.uwrl.usu.edu:20199/files/data/user_2/resample_to_ref_prcp_2_spwan.nc'
 
 try:
     response_data = hds.convert_netcdf_units(input_netcdf_url_path=input_netcdf_url_path,
