@@ -34,16 +34,16 @@ class HydroDSNotFoundException(Exception):
 def singleton(cls):
     instances = {}
 
-    def getinstance(base_url='https://hydrogate.uwrl.usu.edu/hydrogate', username=None, password=None, hpc=None):
+    def getinstance(base_url='https://hydrogate.uwrl.usu.edu/hydrogate', username=None, password=None):
         if cls not in instances:
-            instances[cls] = cls(base_url, username, password, hpc)
+            instances[cls] = cls(base_url, username, password)
         return instances[cls]
     return getinstance
 
 
 @singleton
 class HydroDS(object):
-    def __init__(self, base_url='https://hydrogate.uwrl.usu.edu/hydrogate', username=None, password=None, hpc=None):
+    def __init__(self, base_url='https://hydrogate.uwrl.usu.edu/hydrogate', username=None, password=None):
         self.base_url = base_url
         if self.base_url.endswith('/'):
             self.base_url = self.base_url.strip('/')
@@ -64,17 +64,10 @@ class HydroDS(object):
         self.requests = requests
         self.authorization = (username, password)
         self.hydroshare_auth = None
-        # if self.username and self.password:
-        #     self.requests.auth.HTTPBasicAuth(self.username, self.password)
-        #     self.user_authenticated = True
-        # else:
-        #     self.user_authenticated = False
-
+        self.hpc_username = None
+        self.hpc_password = None
+        self.default_hpc = 'USU'
         self.token = None
-        if not hpc:
-            self.default_hpc = 'USU' #'MountMoran'
-        else:
-            self.default_hpc = hpc
 
         _ServiceLog.load()
 
@@ -127,7 +120,25 @@ class HydroDS(object):
             except:
                 print("Login failed.")
 
-    def authenticate_user(self, username, password, hpc=None):
+    def hpc_authenticate(self, username, password, hpc='USU'):
+        if hpc in self.get_available_hpc():
+            self.token = None
+            self.user_hpc_authenticated = False
+            self.hpc_username = username
+            self.hpc_password = password
+            try:
+                self.requests.auth.HTTPBasicAuth(self.hpc_username, self.hpc_password)
+                self.get_token()
+                self.user_hpc_authenticated = True
+                self.default_hpc = hpc
+            except:
+                raise HydroDSNotAuthenticatedException("User authentication failed for HPC:{hpc_system}".format(
+                    hpc_system=hpc))
+        else:
+            raise HydroDSNotAuthenticatedException("User authentication for HPC failed. Provided HPC (%s) is not "
+                                                   "supported." % hpc)
+
+    def irods_authenticate(self, username, password, hpc=None):
         if hpc:
             if hpc in self.get_available_hpc():
                 self.token = None
@@ -156,14 +167,14 @@ class HydroDS(object):
                 raise Exception ("User authentication for iRODS failed.")
 
     def get_available_hpc(self):
-        return ('USU',)
+        return ('USU', 'HydrogateHPC')
 
     def set_default_hpc(self, hpc):
         available_hpc = self.get_available_hpc()
         if hpc in available_hpc:
             self.default_hpc = hpc
         else:
-            raise Exception("Invalid hpc resource.")
+            raise HydroDSArgumentException("{hpc_system} invalid hpc resource.".format(hpc_system=hpc))
 
     def get_available_programs(self, hpc=None):
         # returns a list of installed program names that are installed on a specified hpc resource
@@ -323,7 +334,7 @@ class HydroDS(object):
         else:
             raise Exception('Error:' + response_dict['description'])
 
-    def submit_job(self, package_id, program_name, input_raster_file_name, **kwargs):
+    def submit_job(self, package_id, program_name, input_raster_file_name=None, **kwargs):
        # TODO: check that the user provided program_name is one of the supported programs using the get_available_programs()
         self._check_user_hpc_authentication()
 
@@ -335,6 +346,8 @@ class HydroDS(object):
             job_def = kwargs
         else:
             if program_name == 'pitremove':
+                if input_raster_file_name is None:
+                    raise Exception("A value for paramter input_raster_file_name is needed for running pitremove")
                 job_def['program'] = 'pitremove'
                 job_def['walltime'] = '00:00:50'
                 job_def['outputlist'] = ['fel*.tif']
@@ -595,19 +608,27 @@ class HydroDS(object):
         response = self._make_data_service_request(url=url, params=payload)
         return self._process_dataservice_response(response, save_as)
 
-    def raster_to_netcdf(self, input_raster_url_path, output_netcdf, save_as=None):
+    def raster_to_netcdf(self, input_raster_url_path, output_netcdf, increasing_x=False, increasing_y=False,
+                         output_varname='Band1', save_as=None):
         """
         Generate a ntecdf file from a raster file (convert data in raster format to netcdf format)
+        Additionally reorder netcdf data in the direction of increasing X-coordinate and/or increasing Y-coordinate
+        values
 
-        :param input_raster_url_path: url file path for the user owned raster to be used for generating a netcdf file
+        :param input_raster_url_path: url file path for the user owned raster in HydroDS to be used for generating a
+                                      netcdf file
         :type input_raster_url_path: string
         :param output_netcdf: name for the generated netcdf file
         :type output_netcdf: string
+        :param increasing_x: If data in netcdf format to be ordered in the direction of increasing X-coordinate
+        :type increasing_x: bool
+        :param increasing_y: If data in netcdf format to be ordered in the direction of increasing Y-coordinate
+        :type increasing_y: bool
         :param save_as: (optional) file name and file path to save the generated netcdf file locally
         :type save_as: string
         :return: a dictionary with key 'output_netcdf' and value of url path for the generated netcdf file
 
-         :raises: HydroDSArgumentException: one or more argument failed validation at client side
+        :raises: HydroDSArgumentException: one or more argument failed validation at client side
         :raises: HydroDSBadRequestException: one or more argument failed validation on the server side
         :raises: HydroDSNotAuthenticatedException: provided user account failed validation
         :raises: HydroDSNotAuthorizedException: user making this request is not authorized to do so
@@ -615,8 +636,8 @@ class HydroDS(object):
 
         Example usage:
             hds = HydroDS(username=your_username, password=your_password)
-            response_data = hds.raster_to_netcdf(input_raster_url_path=provide_input_raster_url_here,
-                                                 output_netcdf='raster_to_netcdf.nc')
+            response_data = hds.raster_to_netcdf(input_raster_url_path=provide_input_raster_url_path_here, increasing_y=True,
+                                         output_netcdf='raster_to_netcdf_slope_logan.nc')
             output_netcdf_url = response_data['output_netcdf']
 
             # print the url path for the generated netcdf file
@@ -631,7 +652,8 @@ class HydroDS(object):
                                            'name.'.format(file_name=output_netcdf))
 
         url = self._get_dataservice_specific_url('rastertonetcdf')
-        payload = {"input_raster": input_raster_url_path, 'output_netcdf': output_netcdf}
+        payload = {"input_raster": input_raster_url_path, 'output_netcdf': output_netcdf, 'increasing_x': increasing_x,
+                   'increasing_y': increasing_y, 'output_varname': output_varname}
 
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
@@ -1903,7 +1925,7 @@ class HydroDS(object):
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
 
-    def download_file_old(self, file_url_path, save_as):
+    def hydrogate_download_file(self, file_url_path, save_as):
         self._check_user_irods_authentication()
         if not self._validate_file_save_as(save_as):
             return
@@ -2070,6 +2092,31 @@ class HydroDS(object):
         else:
             # TODO: generate more specific exception based on the specific response status code
             raise HydroDSException("Failed to create a resource in HydroShare.{reason}".format(reason=response.reason))
+
+    ## TOPNET
+    def download_streamflow(self, usgs_gage, start_year, end_year, output_streamflow=None, save_as=None):
+        """
+        :param input_netcdf_url_path: url file path to netcdf file on the api server which needs to be resampled
+        :param ref_netcdf_url_path:
+        :param output_netcdf:
+        :param  variable_name: name of the variable in the input netcdf to be used for resampling
+        :param save_as:
+        :return:
+
+        # URL: http://129.123.41.184:20199/api/dataservice/resamplenetcdftoreferencenetcdf?input_netcdf=
+        http://129.123.41.184:20199/files/data/user_2/test_proj.nc&reference_netcdf=http://129.123.41.184:20199/files/
+        data/user_2/SpawnWS_yrev.nc&output_netcdf=resample.nc&variable_name=prcp
+        """
+
+        if save_as:
+            self._validate_file_save_as(save_as)
+
+        url = self._get_dataservice_specific_url('downloadstreamflow')
+        payload = {"USGS_gage": usgs_gage, 'Start_Year': start_year, "End_Year": end_year}
+
+        response = self._make_data_service_request(url, params=payload)
+        return self._process_dataservice_response(response, save_as)
+
 
     def _validate_output_raster_file_name(self, file_name):
         err_msg = "Invalid output raster file name:{file_name}".format(file_name=file_name)
