@@ -2026,16 +2026,16 @@ class HydroDS(object):
         Example usage:
             hds = HydroDS(username=your_username, password=your_password)
             input_netcdf_url_path = 'http://hydro-ds.uwrl.usu.edu:20199/files/data/user_2/subset_netcdf_to_spawn.nc'
-            try:
-                response_data = hds.convert_netcdf_units(input_netcdf_url_path=input_netcdf_url_path,
-                                                         output_netcdf='converted_units_spwan.nc',
-                                                         variable_name='prcp', variable_new_units="m/hr",
-                                                         multiplier_factor=0.00004167, offset=0)
 
-                output_netcdf_url = response_data['output_netcdf']
+            response_data = hds.convert_netcdf_units(input_netcdf_url_path=input_netcdf_url_path,
+                                                     output_netcdf='converted_units_spwan.nc',
+                                                     variable_name='prcp', variable_new_units="m/hr",
+                                                     multiplier_factor=0.00004167, offset=0)
 
-                # print the url path for the generated netcdf file
-                print(output_netcdf_url)
+            output_netcdf_url = response_data['output_netcdf']
+
+            # print the url path for the generated netcdf file
+            print(output_netcdf_url)
         """
 
         if save_as:
