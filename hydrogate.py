@@ -406,9 +406,9 @@ class HydroDS(object):
 
     def list_my_files(self):
         """
-        Lists url file paths for all the files the user owns
+        Lists url file paths for all the files the user owns on HydroDS api server
 
-        :return: List of url file paths
+        :return: a list of url file paths
 
         :raises: HydroDSNotAuthenticatedException: provided user account failed validation
 
@@ -426,8 +426,10 @@ class HydroDS(object):
 
     def delete_my_file(self, file_name):
         """
-        Deletes a user file on the server
-        :param file_name: name of the file to be deleted from the HydroDS ap server
+        Deletes a user file
+
+        :param file_name: name of the file (user owned) to be deleted from the HydroDS api server
+        :type file_name: string
         :return: name of the file that got deleted
 
         :raises: HydroDSArgumentException: one or more argument failed validation at client side
@@ -451,6 +453,43 @@ class HydroDS(object):
         return self._process_dataservice_response(response, save_as=None)
 
     def get_static_files_info(self):
+        """
+        Gets a list of supported data resources on the HydroDS api server
+
+        :return: a list of supported data files that includes metadata for each file
+
+        example of return data:
+        [
+            {
+                "variables": [
+                    {
+                        "name": "DEM",
+                        "description": "Digital Elevation Model",
+                        "unit": "N/A"
+                    }
+                ],
+                "time_period": "N/A",
+                "spatial_extent": "Western USA",
+                "data_source": "USGS",
+                "data_format": "Tiff",
+                "file_name": "nedWesternUS.tif"
+            },
+            {
+                "variables": [
+                    {
+                        "name": "NLCD",
+                        "description": "National Land Cover Dataset",
+                        "unit": "N/A"
+                    }
+                ],
+                "time_period": "N/A",
+                "spatial_extent": "Whole USA",
+                "data_source": "USGS",
+                "data_format": "Tiff",
+                "file_name": "nlcd2011CONUS.tif"
+            }
+        ]
+        """
         url = self._get_dataservice_specific_url('showstaticdata/info')
         response = self._make_data_service_request(url=url)
         return self._process_dataservice_response(response, save_as=None)
@@ -469,9 +508,11 @@ class HydroDS(object):
         :type bottom: float
         :param input_raster: raster file to subset from (this can either be a url path for the user file on the HydroDS
                              server or name of a relevant supported data file on the HydroDS server)
-        :param output_raster: name for the output (subsetted) raster file
+        :param output_raster: name for the output (subsetted) raster file (if there is file already with the same name it will be
+                              overwritten)
         :type output_raster: string
         :param save_as: (optional) file name and file path to save the subsetted raster file locally
+        :type save_as: string
         :return: a dictionary with key 'output_raster' and value of url path for the generated raster file
 
         :raises: HydroDSArgumentException: one or more argument failed validation at client side
@@ -538,31 +579,6 @@ class HydroDS(object):
         response = self._make_data_service_request(url=url, params=payload)
         return self._process_dataservice_response(response, save_as)
 
-    # TODO: the following function is porbably obsolete - replaced by the function delineate_watershed()
-    def generate_watershed_raster(self, input_raster_url_path, outlet_shapefile_url_path, save_as=None):
-        self._check_user_irods_authentication()
-
-        if save_as:
-            if not self._validate_file_save_as(save_as):
-                return
-
-            # file_name = os.path.basename(save_as)
-                # if not self._validate_file_name(file_name):
-                #     print("Error: Invalid file name specified (%s)." % file_name)
-                #     return
-
-        url = self.dataservice_base_url + '/generatewatershedraster'
-        # you need to only send the file name part from the actual url path and we are removing the .zip from the file name
-        # given the file url path: "http://129.123.41.158:8080/dem/user2623623514710145932.txt.zip"
-        # we will be passing: user2623623514710145932.txt
-        # input_raster = input_raster.split("/")[-1][:-4]
-        input_raster_name = self._get_file_name_from_url_file_path(input_raster_url_path)
-        outlet_shapefile_name = self._get_file_name_from_url_file_path(outlet_shapefile_url_path)
-        payload = {"raster": input_raster_name, 'outletshp': outlet_shapefile_name}
-
-        response = self.requests.get(url, params=payload)
-        return self._process_service_response(response, 'generate_watershed_raster', save_as)
-
     def subset_raster_to_reference(self, input_raster_url_path, ref_raster_url_path, output_raster, save_as=None):
         """
         Subset raster data based on a reference raster data
@@ -572,7 +588,8 @@ class HydroDS(object):
         :type input_raster_url_path: string
         :param ref_raster_url_path: url file path for the user owned raster file (on the HydroDS server) to be used as
                                     a reference for subsetting
-        :param output_raster: name for the output (subsetted) raster file
+        :param output_raster: name for the output (subsetted) raster file (if there is file already with the same name
+                              it will be overwritten)
         :param save_as: (optional) raster file name and file path to save the projected/resampled raster file locally
         :type save_as: string
         :return: a dictionary with key 'output_raster' and value of url path for the subset raster file
@@ -611,14 +628,15 @@ class HydroDS(object):
     def raster_to_netcdf(self, input_raster_url_path, output_netcdf, increasing_x=False, increasing_y=False,
                          output_varname='Band1', save_as=None):
         """
-        Generate a ntecdf file from a raster file (convert data in raster format to netcdf format)
+        Generate a netcdf file from a raster file (convert data in raster format to netcdf format)
         Additionally reorder netcdf data in the direction of increasing X-coordinate and/or increasing Y-coordinate
         values
 
-        :param input_raster_url_path: url file path for the user owned raster in HydroDS to be used for generating a
-                                      netcdf file
+        :param input_raster_url_path: url file path for the (user owned) raster on HydroDS api server to be used for
+                                      generating a netcdf file
         :type input_raster_url_path: string
-        :param output_netcdf: name for the generated netcdf file
+        :param output_netcdf: name for the generated netcdf file (if there is file already with the same name it will be
+                              overwritten)
         :type output_netcdf: string
         :param increasing_x: If data in netcdf format to be ordered in the direction of increasing X-coordinate
         :type increasing_x: bool
@@ -636,8 +654,9 @@ class HydroDS(object):
 
         Example usage:
             hds = HydroDS(username=your_username, password=your_password)
-            response_data = hds.raster_to_netcdf(input_raster_url_path=provide_input_raster_url_path_here, increasing_y=True,
-                                         output_netcdf='raster_to_netcdf_slope_logan.nc')
+            response_data = hds.raster_to_netcdf(input_raster_url_path=provide_input_raster_url_path_here,
+                                                 increasing_y=True, output_netcdf='raster_to_netcdf_slope_logan.nc')
+
             output_netcdf_url = response_data['output_netcdf']
 
             # print the url path for the generated netcdf file
@@ -651,6 +670,12 @@ class HydroDS(object):
             raise HydroDSArgumentException('{file_name} is not a valid NetCDF file '
                                            'name.'.format(file_name=output_netcdf))
 
+        if not isinstance(increasing_x, bool):
+            raise HydroDSArgumentException("increasing_x must be a boolean value")
+
+        if not isinstance(increasing_y, bool):
+            raise HydroDSArgumentException("increasing_y must be a boolean value")
+
         url = self._get_dataservice_specific_url('rastertonetcdf')
         payload = {"input_raster": input_raster_url_path, 'output_netcdf': output_netcdf, 'increasing_x': increasing_x,
                    'increasing_y': increasing_y, 'output_varname': output_varname}
@@ -662,10 +687,14 @@ class HydroDS(object):
         """
         Creates a raster with slope data
 
-        :param input_raster_url_path: url file path of the raster file on HydroDS api server for which slope data
-        is needed
-        :param output_raster: name of the output slope raster file
+        :param input_raster_url_path: url file path of the raster file (user owned) on HydroDS api server for which
+                                      slope data is needed
+        :type input_raster_url_path: string
+        :param output_raster: name of the output slope raster file (if there is file already with the same name it will be
+                              overwritten)
+        :type output_raster: string
         :param save_as: (optional) raster file name and file path to save the generated slope raster file locally
+        :type save_as: string
         :return:a dictionary with key 'output_raster' and value of url path for the slope raster file
 
         :raises: HydroDSArgumentException: one or more argument failed validation at client side
@@ -690,11 +719,15 @@ class HydroDS(object):
         """
         Creates a raster with aspect data
 
-        :param input_raster_url_path: url file path of the raster file on HydroDS api server for which aspect data
-        is needed
-        :param output_raster: name of the output aspect raster file
+        :param input_raster_url_path: url file path of the raster file (user owned) on HydroDS api server for which
+                                      aspect data is needed
+        :type input_raster_url_path: string
+        :param output_raster: name of the output aspect raster file (if there is file already with the same name it will be
+                              overwritten)
+        :type output_raster: string
         :param save_as: (optional) raster file name and file path to save the generated aspect raster file locally
-        :return:a dictionary with key 'output_raster' and value of url path for the slope raster file
+        :type save_as: string
+        :return:a dictionary with key 'output_raster' and value of url path for the aspect raster file
 
         :raises: HydroDSArgumentException: one or more argument failed validation at client side
         :raises: HydroDSBadRequestException: one or more argument failed validation on the server side
@@ -735,10 +768,16 @@ class HydroDS(object):
         Project and clip a raster based on a reference raster
 
         :param input_raster: raster to be projected and clipped (just the file name if this data is supported by
-                             HydroDS otherwise, url file path)
-        :param ref_raster_url_path: url path of the raster to be used as the reference for projection and clipping
-        :param output_raster: name for the output raster
+                             HydroDS otherwise, HydroDS url file path)
+        :type input_raster: string
+        :param ref_raster_url_path: url path of the raster (user owned) to be used as the reference for projection and
+                                    clipping
+        :type ref_raster_url_path: string
+        :param output_raster: name for the output raster (if there is file already with the same name it will be
+                              overwritten)
+        :type output_raster: string
         :param save_as: (optional) file name and file path to save the generated raster file locally
+        :type save_as: string
         :return: a dictionary with key 'output_raster' and value of url path for the generated raster file
 
         :raises: HydroDSArgumentException: one or more argument failed validation at client side
@@ -750,7 +789,7 @@ class HydroDS(object):
         Example usage:
             hds = HydroDS(username=your_username, password=your_password)
             ref_input_raster_url = 'http://hydro-ds-uwrl.usu.edu:20199/files/data/user_2/SpawnProj.tif'
-            input_raster = 'nlcd2011CONUS.tif'  # this a static data file on the HydroDS server
+            input_raster = 'nlcd2011CONUS.tif'  # this a supported data resource file on the HydroDS api server
             hds_response_data =  hds.project_clip_raster(input_raster=input_raster,
                                                          ref_raster_url_path=ref_input_raster_url,
                                                          output_raster='nlcd_proj_spwan.tif')
@@ -790,9 +829,14 @@ class HydroDS(object):
         """
         Generates a netcdf file that contains NLCD data for a given variable
 
-        :param input_NLCD_raster_url_path: url file path for the raster for which NLCD data needs to be generated
+        :param input_NLCD_raster_url_path: url file path for the raster (user owned) on the HydroDS api server for
+                                           which NLCD data needs to be generated
+        :type input_NLCD_raster_url_path: string
         :param variable_name: name of the data variable (valid variable names are: 'cc', 'hcan', 'lai')
-        :param output_netcdf: name for the output netcdf file
+        :type variable_name: string
+        :param output_netcdf: name for the output netcdf file (if there is file already with the same name it will be
+                              overwritten)
+        :type output_netcdf: string
         :return: a dictionary with key 'output_netcdf' and value of url path for the netcdf file generated
 
         :raises: HydroDSArgumentException: one or more argument failed validation at client side
@@ -859,10 +903,15 @@ class HydroDS(object):
         """
         Combines two rasters to create a new raster
 
-        :param input_one_raster_url_path: url file path for the 1st raster file on HydroDS api server
-        :param input_two_raster_url_path: url file path for the 2nd raster file on HydroDS api server
-        :param output_raster: name of the output (combined) raster file
+        :param input_one_raster_url_path: url file path for the 1st raster file (user owned) on HydroDS api server
+        :type input_one_raster_url_path: string
+        :param input_two_raster_url_path: url file path for the 2nd raster file (user owned) on HydroDS api server
+        :type input_two_raster_url_path: string
+        :param output_raster: name of the output (combined) raster file (if there is file already with the same name it will be
+                              overwritten)
+        :type output_raster: string
         :param save_as: (optional) raster file name and file path to save the generated combined raster file locally
+        :type save_as: string
         :return: a dictionary with key 'output_raster' and value of url path for the combined raster file
 
         :raises: HydroDSArgumentException: one or more argument failed validation at client side
@@ -966,6 +1015,34 @@ class HydroDS(object):
         return self._process_service_response(response, "get_daymet_tile", save_as)
 
     def reverse_netcdf_yaxis(self, input_netcdf_url_path, output_netcdf, save_as=None):
+        """
+        Reverse netcdf Y-coordinate data
+
+        :param input_netcdf_url_path: url file path of a netcdf file (user owned) on HydroDS api server for which data
+                                      needs to be reversed
+        :type input_netcdf_url_path: string
+        :param output_netcdf: name for the output netcdf file (if there is file already with the same name it will be
+                              overwritten)
+        :type output_netcdf: string
+        :param save_as: (optional) file name and file path to save the generated netcdf file locally
+        :return: a dictionary with key 'output_netcdf' and value of url path for the output netcdf file
+
+        :raises: HydroDSArgumentException: one or more argument failed validation at client side
+        :raises: HydroDSBadRequestException: one or more argument failed validation on the server side
+        :raises: HydroDSNotAuthenticatedException: provided user account failed validation
+        :raises: HydroDSNotAuthorizedException: user making this request is not authorized to do so
+        :raises: HydroDSNotFoundException: specified netcdf input file doesn't exist on HydroDS server
+
+        Example usage:
+            hds = HydroDS(username=your_username, password=your_password)
+            response_data = hds.reverse_netcdf_yaxis(input_netcdf_url_path=provide_input_netcdf_url,
+                                                     output_netcdf='resample_reverse_yaxis.nc')
+
+            output_reverse_netcdf_url = response_data['output_netcdf']
+
+            # print the url path for the generated netcdf file
+            print(output_reverse_netcdf_url)
+        """
         if save_as:
             self._validate_file_save_as(save_as)
 
@@ -980,6 +1057,40 @@ class HydroDS(object):
 
     def reverse_netcdf_yaxis_rename_variable(self, input_netcdf_url_path, output_netcdf, input_variable_name=None,
                                              output_variable_name=None, save_as=None):
+        """
+        Reverse netcdf data in the direction of Y-coordinate and optionally rename variable
+
+        :param input_netcdf_url_path: url file path for a netcdf file (user owned) on the HydroDS api server for which
+                                      data to be reversed and variable to be renamed
+        :type input_netcdf_url_path: string
+        :param output_netcdf: name for the output netcdf file (if there is file already with the same name it will be
+                              overwritten)
+        :type output_netcdf: string
+        :param input_variable_name: (optional) name of the variable in the input netcdf file
+        :type input_variable_name: string
+        :param output_variable_name: (optional) new name for the variable
+        :type output_variable_name: string
+        :param save_as: (optional) file name and file path to save the generated netcdf file locally
+        :type save_as: string
+        :return: a dictionary with key 'output_netcdf' and value of url path for the output netcdf file
+
+        :raises: HydroDSArgumentException: one or more argument failed validation at client side
+        :raises: HydroDSBadRequestException: one or more argument failed validation on the server side
+        :raises: HydroDSNotAuthenticatedException: provided user account failed validation
+        :raises: HydroDSNotAuthorizedException: user making this request is not authorized to do so
+        :raises: HydroDSNotFoundException: specified netcdf input file doesn't exist on HydroDS server
+
+        Example usage:
+            hds = HydroDS(username=your_username, password=your_password)
+            response_data = hds.reverse_netcdf_yaxis_rename_variable(input_netcdf_url_path=provide_input_netcdf_url,
+                                                             input_variable_name='Band1', output_variable_name='Band1',
+                                                             output_netcdf='resample_reverse_yaxis_rename_variable.nc')
+
+            output_reverse_rename_netcdf_url = response_data['output_netcdf']
+
+            # print the url path for the generated netcdf file
+            print(output_reverse_rename_netcdf_url)
+        """
         if save_as:
             self._validate_file_save_as(save_as)
 
@@ -1028,14 +1139,36 @@ class HydroDS(object):
 
     def subset_netcdf(self, input_netcdf, ref_raster_url_path, output_netcdf, save_as=None):
         """
-        :param input_netcdf: This can be either just a file name in which case this will be treated as a static data file
-                             on the server or a url file path
-        :param ref_raster_url_path:
-        :param output_netcdf:
-        :param save_as:
-        :return:
+        Subset netcdf data based on a reference raster
 
-        # URL: http://hostname/api/dataservice/subsetnetcdftoreference?input_netcdf=prcp_2010.nc4&reference_raster=http://129.123.41.184:20199/files/data/user_2/SpawnProj.tif
+        :param input_netcdf: either a file name for a supported netcdf data resource (static data file) on HydroDS api server
+                             on url file path for a netcd file that the user owns on the HydroDS server
+        :type input_netcdf: string
+        :param ref_raster_url_path: url file path for a raster file (user owned) on the HydroDS api server that needs
+                                    to be used as a reference for subsetting
+        :type ref_raster_url_path: string
+        :param output_netcdf: name for the output netcdf file (if there is file already with the same name it will be
+                              overwritten)
+        :param save_as: (optional) file name and file path to save the generated netcdf file locally
+        :type save_as: string
+        :return: a dictionary with key 'output_netcdf' and value of url path for the output netcdf file
+
+        :raises: HydroDSArgumentException: one or more argument failed validation at client side
+        :raises: HydroDSBadRequestException: one or more argument failed validation on the server side
+        :raises: HydroDSNotAuthenticatedException: provided user account failed validation
+        :raises: HydroDSNotAuthorizedException: user making this request is not authorized to do so
+        :raises: HydroDSNotFoundException: specified netcdf input file doesn't exist on HydroDS server
+
+        Example usage:
+            hds = HydroDS(username=your_username, password=your_password)
+            response_data = hds.subset_netcdf(input_netcdf=provide_input_netcdf_static_file_or_url_file_path,
+                                              ref_raster_url_path=ref_input_raster_url,
+                                              output_netcdf='subset_netcdf_to_spawn.nc')
+
+            output_subset_netcdf_url = response_data['output_netcdf']
+
+            # print the url path for the generated netcdf file
+            print(output_subset_netcdf_url)
         """
 
         if save_as:
@@ -1064,7 +1197,8 @@ class HydroDS(object):
         :type start_time_index: integer
         :param end_time_index: end time for subsetting
         :type end_time_index: integer
-        :param output_netcdf: name for the output (subsetted) netcdf file
+        :param output_netcdf: name for the output (subsetted) netcdf file (if there is file already with the same name
+                              it will be overwritten)
         :type output_netcdf: string
         :param save_as: (optional) netcdf file name and file path to save the subsetted netcdf file locally
         :type save_as: string
@@ -1117,13 +1251,19 @@ class HydroDS(object):
 
     def project_netcdf(self, input_netcdf_url_path, utm_zone, variable_name, output_netcdf, save_as=None):
         """
-        Project a netcdf file
+        Projects a netcdf file
 
-        :param input_netcdf_url_path: url file path for the netcdf file to be projected
+        :param input_netcdf_url_path: url file path for the netcdf file (user owned) on the HydroDS api server to be
+                                      projected
         :param utm_zone: UTM zone value to use for projection
+        :type utm_zone: integer
         :param variable_name: name of the data variable for which data to be projected
-        :param output_netcdf: name for the output (projected) netcdf file
+        :type variable_name: string
+        :param output_netcdf: name for the output (projected) netcdf file (if there is file already with the same name
+                              it will be overwritten)
+        :type output_netcdf: string
         :param save_as: (optional) file name and file path to save the projected netcdf file locally
+        :type save_as: string
         :return: a dictionary with key 'output_netcdf' and value of url path for the projected netcdf file
 
         :raises: HydroDSArgumentException: one or more argument failed validation at client side
@@ -1145,11 +1285,18 @@ class HydroDS(object):
 
         if save_as:
             self._validate_file_save_as(save_as)
+        try:
+            int(utm_zone)
+        except TypeError:
+            raise HydroDSArgumentException("A value for utm_zone must be an integer number")
+
+        if not self._is_file_name_valid(output_netcdf, ext='.nc'):
+            raise HydroDSArgumentException('{file_name} is not a valid NetCDF file '
+                                           'name.'.format(file_name=output_netcdf))
 
         url = self._get_dataservice_specific_url('projectnetcdf')
-        payload = {"input_netcdf": input_netcdf_url_path, 'variable_name': variable_name, 'utm_zone': utm_zone}
-        self._is_file_name_valid(output_netcdf, ext='.nc')
-        payload['output_netcdf'] = output_netcdf
+        payload = {"input_netcdf": input_netcdf_url_path, 'variable_name': variable_name, 'utm_zone': utm_zone,
+                   'output_netcdf': output_netcdf}
 
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
@@ -1166,7 +1313,8 @@ class HydroDS(object):
         :type ref_netcdf_url_path: string
         :param variable_name:  name of the data variable in input netcdf to be used for projection and resampling
         :type variable_name: string
-        :param output_netcdf: name for the output (projected/subsetted/resampled) netcdf file
+        :param output_netcdf: name for the output (projected/subsetted/resampled) netcdf file (if there is file already
+                              with the same name it will be overwritten)
         :type output_netcdf: string
         :param save_as: (optional) netcdf file name and file path to save the projected/subsetted/resampled netcdf file
                         locally
@@ -1209,10 +1357,15 @@ class HydroDS(object):
         """
         Joins two netcdf files to create a new netcdf file
 
-        :param input_netcdf1_url_path: url file path for the 1st netcdf file (user owned) on HydroDS
-        :param input_netcdf2_url_path: url file path for the 2nd netcdf file (user owned) on HydroDS
-        :param output_netcdf: name of the output (concatenated) netcdf file
+        :param input_netcdf1_url_path: url file path for the 1st netcdf file (user owned) on HydroDS api server
+        :type input_netcdf1_url_path: string
+        :param input_netcdf2_url_path: url file path for the 2nd netcdf file (user owned) on HydroDS api server
+        :type input_netcdf2_url_path: string
+        :param output_netcdf: name of the output (concatenated) netcdf file (if there is file already with the same name it will be
+                              overwritten)
+        :type output_netcdf: string
         :param save_as: (optional) file name and file path to save the generated concatenated netcdf file locally
+        :type save_as: string
         :return: a dictionary with key 'output_netcdf' and value of url path for the joined netcdf file
 
         :raises: HydroDSArgumentException: one or more argument failed validation at client side
@@ -1223,8 +1376,8 @@ class HydroDS(object):
 
         Example usage:
             hds = HydroDS(username=your_username, password=your_password)
-            hds_response_data = hds.concatenate_netcdf(input_netcdf1_url_path='url_path_for_1st_netcdf_file',
-                                                       input_netcdf2_url_path='url_path_for_2nd_netcdf_file',
+            hds_response_data = hds.concatenate_netcdf(input_netcdf1_url_path=provide_url_path_for_1st_netcdf_file,
+                                                       input_netcdf2_url_path=provide_url_path_for_2nd_netcdf_file,
                                                        output_netcdf='concatenated.nc',
                                                        save_as=r'C:\hydro-DS_test\concatenated_prcp_2015.nc')
 
@@ -1250,10 +1403,16 @@ class HydroDS(object):
         """
         Project a raster to UTM NAD83 projection
 
-        :param input_raster_url_path: url file path for the user owned raster to be projected
+        :param input_raster_url_path: url file path for the (user owned) raster on the HydroDS api server to be
+                                      projected
+        :type input_raster_url_path: string
         :param utm_zone: UTM zone value to be used for projection
-        :param output_raster: name for the output (projected) raster file
+        :type utm_zone: integer
+        :param output_raster: name for the output (projected) raster file (if there is file already with the same name
+                              it will be overwritten)
+        :type output_raster: string
         :param save_as: (optional) raster file name and file path to save the projected raster file locally
+        :type save_as: string
         :return: a dictionary with key 'output_raster' and value of url path for the projected raster file
 
         :raises: HydroDSArgumentException: one or more argument failed validation at client side
@@ -1277,6 +1436,10 @@ class HydroDS(object):
         if not self._is_file_name_valid(output_raster, ext='.tif'):
             raise HydroDSArgumentException('{file_name} is not a valid raster file '
                                            'name.'.format(file_name=output_raster))
+        try:
+            int(utm_zone)
+        except TypeError:
+            raise HydroDSArgumentException("A value for utm_zone must be an integer number")
 
         url = self._get_dataservice_specific_url('projectraster')
         payload = {"input_raster": input_raster_url_path, 'utmZone': utm_zone, 'output_raster': output_raster}
@@ -1290,10 +1453,12 @@ class HydroDS(object):
         """
         Project a shapefile either based on UTM zone or EPSG code
 
-        :param input_shapefile_url_path: url file path for the user owned shapefile to be projected
+        :param input_shapefile_url_path: url file path for the (user owned) shapefile on the HydroDS api server to be
+                                         projected
         :type input_shapefile_url_path: string
-        :param output_shape_file: name for the output (projected) shapefile (file extension must be '.shp'). Generated
-                                  shapefile is saved on the HydroDS server as a zip file.
+        :param output_shape_file: name for the output (projected) shapefile (file type must be '.shp'). Generated
+                                  shapefile is saved on the HydroDS server as a zip file. (if there is file already
+                                  with the same name it will be overwritten)
         :type output_shape_file: string
         :param utm_zone: UTM zone value to be used for projection (required if epsg_code is None)
         :type utm_zone: integer
@@ -1323,6 +1488,7 @@ class HydroDS(object):
             # projection using EPSG code
             response_data = hds.project_shapefile(input_shapefile_url_path=your_input_shapefile_url, epsg_code=2152,
                                                   output_shape_file='outlet-proj_epsg.shp')
+
             output_proj_epsg_shapefile_url = response_data['output_shape_file']
 
             # print the url path for the generated shapefile
@@ -1364,9 +1530,14 @@ class HydroDS(object):
         Create an outlet shapefile. The generated shapefile is stored on the server as a zip file
 
         :param point_x: X-coordinate of outlet point
+        :type point_x: float
         :param point_y: Y-coordinate of outlet point
-        :param output_shape_file_name: name of the outlet shapefile
+        :type point_y: float
+        :param output_shape_file_name: name of the outlet shapefile (must be of type .shp)(if there is file already
+                                       with the same name it will be overwritten)
+        :type output_shape_file_name: string
         :param save_as: (optional) shapefile name and file path to save the generated shapefile locally
+        :type save_as: string
         :return: a dictionary with key 'output_shape_file' and value of url path for the outlet shapefile
 
         :raises: HydroDSArgumentException: one or more argument failed validation at client side
@@ -1402,17 +1573,29 @@ class HydroDS(object):
                             epsg_code=None, outlet_point_x=None, outlet_point_y=None,
                             input_outlet_shapefile_url_path=None, save_as=None):
         """
-        Delineate watershed either using an outlet shapefile or outlet X and Y coordinates
+        Delineate watershed either using an outlet shapefile, or outlet X and Y coordinates
 
-        :param input_raster_url_path: url file path for the raster file for which to delineate watershed
+        :param input_raster_url_path: url file path for the raster file (user owned) on the HydroDS api server for
+                                      which to delineate watershed
+        :type input_raster_url_path: string
         :param threshold: threshold value to be used
-        :param output_raster: file name for the delineated watershed raster file
+        :type threshold: integer
+        :param output_raster: file name for the delineated watershed raster file (if there is file already with the s
+                              ame name it will be overwritten)
+        :type output_raster: string
         :param output_outlet_shapefile: name for the outlet shapefile
+        :type output_outlet_shapefile: string
         :param epsg_code: EPSG code to use for projection (required if not using input_outlet_shapefile_url_path)
+        :type epsg_code: integer
         :param outlet_point_x: X-coordinate of the outlet point (required if not using input_outlet_shapefile_url_path)
+        :type outlet_point_x: float
         :param outlet_point_y: Y-coordinate of the outlet point (required if not using input_outlet_shapefile_url_path)
-        :param input_outlet_shapefile_url_path: url file path for the outlet shape file to be used for outlet location
+        :type outlet_point_y: float
+        :param input_outlet_shapefile_url_path: url file path for the outlet shape file (user owned) on the HydroDS api
+                                                server to be used for outlet location
+        :type input_outlet_shapefile_url_path: string
         :param save_as: (optional) raster file name and file path to save the delineated watershed raster file locally
+        :type save_as: string
         :return:a dictionary with key 'output_raster' and value of url path for the watershed raster file, and
                 key 'output_outlet_shapefile' and value of url path for the outlet shapefile
 
@@ -1461,10 +1644,16 @@ class HydroDS(object):
             self._validate_file_save_as(save_as)
 
         if not self._is_file_name_valid(output_raster, ext='.tif'):
-            raise HydroDSArgumentException("{file_name} is not a valid raster file name".format(file_name=output_raster))
+            raise HydroDSArgumentException("{file_name} is not a valid raster file name".format(
+                file_name=output_raster))
 
         if not self._is_file_name_valid(output_outlet_shapefile, ext='.shp'):
-            raise HydroDSArgumentException("{file_name} is not a valid shapefile name".format(file_name=output_outlet_shapefile))
+            raise HydroDSArgumentException("{file_name} is not a valid shapefile name".format(
+                file_name=output_outlet_shapefile))
+        try:
+            int(threshold)
+        except TypeError:
+            raise HydroDSArgumentException("A value for threshold must be an integer number")
 
         if input_outlet_shapefile_url_path is None:
             if outlet_point_x is None:
@@ -1507,11 +1696,52 @@ class HydroDS(object):
 
     def resample_raster(self, input_raster_url_path, cell_size_dx, cell_size_dy, output_raster, resample='bilinear',
                         save_as=None):
+        """
+        Resample raster data
+
+        :param input_raster_url_path: url file path of a raster file (user owned) on the HydroDs server that needs to
+                                      be resampled
+        :type input_raster_url_path: string
+        :param cell_size_dx: width of the grid cell
+        :type cell_size_dx: integer
+        :param cell_size_dy: height of the grid cell
+        :type cell_size_dy: integer
+        :param output_raster: name for the output raster file (if there is file already with the same name it will be
+                              overwritten)
+        :type output_raster: string
+        :param resample: resampling method (e.g., near, bilinear) (default is 'bilinear')
+        :type resample: string
+        :param save_as: (optional) raster file name and file path to save the delineated watershed raster file locally
+        :type save_as: string
+        :return: a dictionary with key 'output_raster' and value of url path for the generated raster file
+
+        :raises: HydroDSArgumentException: one or more argument failed validation at client side
+        :raises: HydroDSBadRequestException: one or more argument failed validation on the server side
+        :raises: HydroDSNotAuthenticatedException: provided user account failed validation
+        :raises: HydroDSNotAuthorizedException: user making this request is not authorized to do so
+        :raises: HydroDSNotFoundException: specified raster input file does not exist on the server
+
+        Example usage:
+            hds = HydroDS(username=your_username, password=your_password)
+            response_data = hds.resample_raster(input_raster_url_path=provide_input_raster_url, cell_size_dx=50,
+                                                cell_size_dy=50, resample='near', output_raster='resample_spawn.tif')
+
+            output_resample_raster_url = response_data['output_raster']
+
+            # print the url path for the generated raster file
+            print(output_resample_raster_url)
+        """
         if save_as:
             self._validate_file_save_as(save_as)
 
         if not self._is_file_name_valid(output_raster, ext='.tif'):
             raise HydroDSArgumentException("{file_name} is not a valid raster file name".format(file_name=output_raster))
+
+        if not isinstance(cell_size_dx, int):
+            raise  HydroDSArgumentException("cell_size_dx must be an integer value")
+
+        if not isinstance(cell_size_dy, int):
+            raise  HydroDSArgumentException("cell_size_dy must be an integer value")
 
         resample = resample.lower()
         self._validate_resample_input(resample)
@@ -1524,24 +1754,26 @@ class HydroDS(object):
         return self._process_dataservice_response(response, save_as)
 
     def project_resample_raster(self, input_raster_url_path, cell_size_dx, cell_size_dy, output_raster, utm_zone=None,
-                                epsg_code=None, resample=None,  save_as=None):
+                                epsg_code=None, resample='near',  save_as=None):
 
         """
         Project and resample a raster
 
-        :param input_raster_url_path: url file path for the user owned raster to be projected and resampled
+        :param input_raster_url_path: url file path for the (user owned) raster on the HydroDs api server to be
+                                      projected and resampled
         :type input_raster_url_path: string
         :param cell_size_dx: cell width
         :type cell_size_dx: integer
         :param cell_size_dy:  cell height
         :type cell_size_dy: integer
-        :param output_raster: name for the output (projected/resampled) raster file
+        :param output_raster: name for the output (projected/resampled) raster file (if there is file already with the
+                              same name it will be overwritten)
         :type output_raster: string
         :param utm_zone:  UTM zone value to be used for projection (required if epsg_code is None)
         :type utm_zone: integer
         :param epsg_code: EPSG code value to be used for projection (required if utm_zone is None)
         :type epsg_code: integer
-        :param resample: resample method (e.g., near, bilinear)
+        :param resample: resample method (e.g., near, bilinear) (default is 'near')
         :type resample: string
         :param save_as: (optional) raster file name and file path to save the projected/resampled raster file locally
         :type save_as: string
@@ -1597,6 +1829,10 @@ class HydroDS(object):
         url = None
         payload = {"input_raster": input_raster_url_path, 'dx': cell_size_dx, 'dy': cell_size_dy,
                    'output_raster': output_raster}
+        resample = resample.lower()
+        self._validate_resample_input(resample)
+        payload['resample'] = resample
+
         if utm_zone:
             if not isinstance(utm_zone, int):
                 raise HydroDSArgumentException("utm_zone value must be an integer")
@@ -1609,11 +1845,6 @@ class HydroDS(object):
             payload['epsg_code'] = epsg_code
             url = self._get_dataservice_specific_url('projectresamplerasterepsg')
 
-        if resample:
-            resample = resample.lower()
-            self._validate_resample_input(resample)
-            payload['resample'] = resample
-
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
 
@@ -1623,7 +1854,7 @@ class HydroDS(object):
         Subset, project, and resample a raster file
 
         :param input_raster: raster file to subset from (this can either be a url path for the user file on the HydroDS
-                             server or name of a relevant supported data file on the HydroDS server)
+                             api server or name of a relevant supported data resource file on the HydroDS api server)
         :param left: x-coordinate of the left-top corner of the bounding box
         :type left: float
         :param top: y-coordinate of the left-top corner of the bounding box
@@ -1636,7 +1867,8 @@ class HydroDS(object):
         :type cell_size_dx: integer
         :param cell_size_dy: grid cell height
         :type cell_size_dy: integer
-        :param output_raster: name for the output (subsetted) raster file
+        :param output_raster: name for the output (subsetted) raster file (if there is file already with the same name
+                              it will be overwritten)
         :type output_raster: string
         :param epsg_code: (optional) EPSG code value to be used for projection (if not provided, projection will be
                           based on calculated UTM zone value)
@@ -1716,16 +1948,39 @@ class HydroDS(object):
     def resample_netcdf(self, input_netcdf_url_path, ref_netcdf_url_path, variable_name, output_netcdf,
                         save_as=None):
         """
-        :param input_netcdf_url_path: url file path to netcdf file on the api server which needs to be resampled
-        :param ref_netcdf_url_path:
-        :param output_netcdf:
-        :param  variable_name: name of the variable in the input netcdf to be used for resampling
-        :param save_as:
-        :return:
+        Resample a netcdf file
 
-        # URL: http://129.123.41.184:20199/api/dataservice/resamplenetcdftoreferencenetcdf?input_netcdf=
-        http://129.123.41.184:20199/files/data/user_2/test_proj.nc&reference_netcdf=http://129.123.41.184:20199/files/
-        data/user_2/SpawnWS_yrev.nc&output_netcdf=resample.nc&variable_name=prcp
+        :param input_netcdf_url_path: url file path of netcdf file (user owned) on HydroDS api server which needs to be
+                                      resampled
+        :type input_netcdf_url_path: string
+        :param ref_netcdf_url_path: url file path of a netcdf file (user owned) on HydroDs api server to be used as the
+                                    reference for resampling
+        :type ref_netcdf_url_path: string
+        :param output_netcdf: name for the output netcdf file (if there is file already with the same name it will be
+                              overwritten)
+        :type output_netcdf: string
+        :param  variable_name: name of the variable in the input netcdf to be used for resampling
+        :type variable_name: string
+        :param save_as: (optional) file name and file path to save the resampled netcdf  file locally
+        :type save_as: string
+        :return: a dictionary with key 'output_netcdf' and value of url path for the generated netcdf file
+
+        :raises: HydroDSArgumentException: one or more argument failed validation at client side
+        :raises: HydroDSBadRequestException: one or more argument failed validation on the server side
+        :raises: HydroDSNotAuthenticatedException: provided user account failed validation
+        :raises: HydroDSNotAuthorizedException: user making this request is not authorized to do so
+        :raises: HydroDSNotFoundException: specified netcdf input file(s) does not exist on the server
+
+        Example usage:
+            hds = HydroDS(username=your_username, password=your_password)
+            response_data = hds.resample_netcdf(input_netcdf_url_path=provide_input_netcdf_url_path,
+                                        ref_netcdf_url_path=provide_ref_netcdf_url_path, variable_name='prcp',
+                                        output_netcdf='resample_to_ref_prcp_spwan.nc')
+
+            output_resampled_netcdf_url = response_data['output_netcdf']
+
+            # print the url path for the generated netcdf file
+            print(output_resampled_netcdf_url)
         """
 
         if save_as:
@@ -1749,14 +2004,15 @@ class HydroDS(object):
         :param input_netcdf_url_path: url file path of netcdf file on HydroDS server for which variable units need to
                                       be changed
         :type input_netcdf_url_path: string
-        :param output_netcdf: name for the output netcdf file with variable data in converted units
+        :param output_netcdf: name for the output netcdf file with variable data in converted units (if there is file
+                              already with the same name it will be overwritten)
         :type output_netcdf: string
         :param  variable_name: name of the variable in the input netcdf for which units to be converted
         :type variable_name: string
         :param variable_new_units: (optional) name for the converted unit
         :type variable_new_units: string
         :param multiplier_factor: (optional) factor by which the units to be converted (default is 1)
-        :type multiplier_factor: integer
+        :type multiplier_factor: float
         :param offset: (optional) additive factor (default is 0)
         :param save_as: (optional) file name and file path to save the generated netcdf file locally
         :return: a dictionary with key 'output_netcdf' and value of url path for the output netcdf file
@@ -1824,9 +2080,9 @@ class HydroDS(object):
 
     def upload_file(self, file_to_upload):
         """
-        Upload a file to HydroDS server
+        Upload a file to HydroDS api server
 
-        :param file_to_upload: file name and path for the file to upload
+        :param file_to_upload: file name and path for the file to upload from
         :type file_to_upload: string
         :return: url of the uploaded file
 
@@ -1857,11 +2113,13 @@ class HydroDS(object):
 
     def download_file(self, file_url_path, save_as):
         """
-        Download a file (that the user owns) from the HydroDS server
+        Download a file from the HydroDS api server
 
         :param file_url_path: url for the file to be downloaded
+        :type file_url_path: string
         :param save_as: file name and file path to save the downloaded file
-        :return: nothing
+        :type save_as: string
+        :return: None
 
         :raises: HydroDSArgumentException: one or more argument failed validation at client side
         :raises: HydroDSNotAuthenticatedException: provided user account failed validation
@@ -1896,7 +2154,8 @@ class HydroDS(object):
 
         :param files_to_zip: a list of user file names on the HydroDS which need to be zipped
         :type files_to_zip: a list
-        :param zip_file_name: name of output the zip file
+        :param zip_file_name: name of output the zip file (if there is file already with the same name it will be
+                              overwritten)
         :type zip_file_name: string
         :param save_as: (optional) file name and file path to save the zipped file locally
         :type save_as: string
@@ -1964,12 +2223,16 @@ class HydroDS(object):
         """
         Make a user file on HydroDS as a new resource in HydroShare
 
-        :param file_url_path: url of the user file on the HydroDS server to be made a resource in HydroShare
-        :param local_download_directory: local directory path where the user file from HydroDS will be downloaded
+        :param file_name: name of user file on the HydroDS api server to be made as a resource in HydroShare
+        :type file_name: string
         :param resource_type: type of resource to be created in HydroShare
-        :param title: title of the new resource to be created in HydroShare
-        :param abstract: abstract of the new resource to be created in HydroShare
-        :param keywords: keywords for the new resource to be created in HydroShare
+        :type resource_type: string
+        :param title: (optional) title of the new resource to be created in HydroShare
+        :type title: string
+        :param abstract: (optional) abstract of the new resource to be created in HydroShare
+        :type abstract: string
+        :param keywords: (optional) keywords for the new resource to be created in HydroShare
+        :type keywords: list
         :return: a dictionary with keys ('resource_id', 'resource_type') that has value for resource id and resource
                  type of the HydroShare resource
 
@@ -2001,7 +2264,7 @@ class HydroDS(object):
         """
 
         if not self.hydroshare_auth:
-            raise HydroDSNotAuthenticatedException("You don't have access to HydroShare. Set your access to HydroShare "
+            raise HydroDSNotAuthenticatedException("You don't have access to HydroShare. Set your HydroShare login account "
                                                    "using the function set_hydroshare_account()")
 
         url = self._get_dataservice_specific_url('hydroshare/createresource')
@@ -2015,90 +2278,12 @@ class HydroDS(object):
         if keywords:
             if not isinstance(keywords, list):
                 raise HydroDSArgumentException('keywords must be a list')
+
             keywords = ','.join(keywords)
             payload['keywords'] = keywords
 
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as=None)
-
-    def create_hydroshare_resource_old(self, file_url_path, local_download_directory, resource_type, title=None,
-                                   abstract=None, keywords=None):
-        """
-        Make a user file on HydroDS as a new resource in HydroShare
-
-        :param file_url_path: url of the user file on the HydroDS server to be made a resource in HydroShare
-        :param local_download_directory: local directory path where the user file from HydroDS will be downloaded
-        :param resource_type: type of resource to be created in HydroShare
-        :param title: title of the new resource to be created in HydroShare
-        :param abstract: abstract of the new resource to be created in HydroShare
-        :param keywords: keywords for the new resource to be created in HydroShare
-        :return: a dictionary with keys ('resource_id', 'resource_type') that has value for resource id and resource
-                 type of the HydroShare resource
-
-        :raises: HydroDSArgumentException: one or more argument failed validation at client side
-        :raises: HydroDSBadRequestException: one or more argument failed validation on the server side
-        :raises: HydroDSNotAuthenticatedException: provided user account failed validation
-        :raises: HydroDSNotAuthorizedException: user making this request is not authorized to do so
-        :raises: HydroDSNotFoundException: specified file url path failed to resolve
-
-        Example usage:
-            hds = HydroDS(username=your_username, password=your_password)
-            # set hydroshare user account
-            hds.set_hydroshare_account(username=your_hydroshare_username, password=your_hydroshare_password)
-            response_data = hds.create_hydroshare_resource(file_url_path=your_hydrods_file_url_here,
-                                                           local_download_directory='E:\Scratch\HydroGateClientDemo',
-                                                           resource_type='GenericResource',
-                                                           title='Resource created from HydroDS',
-                                                           abstract='Testing resource creation from HydroDS',
-                                                           keywords=['HydroDS', 'HydroShare'])
-            # print id of the resource created in HydroShare
-            print(response_data['resource_id'])
-
-            # print type of of the resource created in HydroShare
-            print(response_data['resource_type'])
-        """
-
-        if not self.hydroshare_auth:
-            raise HydroDSNotAuthenticatedException("You don't have access to HydroShare. Set your access to HydroShare "
-                                                   "using the function set_hydroshare_account()")
-        if not os.path.exists(local_download_directory):
-            raise HydroDSArgumentException("{download_dir} does not exist".format(download_dir=local_download_directory))
-
-        if not os.access(local_download_directory, os.W_OK):
-            raise HydroDSArgumentException("You don't have write permission to the specified directory (%s)."
-                                           % local_download_directory)
-        hs_url = 'http://www.hydroshare.org/hsapi/resource'
-        payload = {'resource_type': resource_type}
-        if title:
-            payload['title'] = title
-        if abstract:
-            payload['abstract'] = abstract
-
-        if keywords:
-            if not isinstance(keywords, list):
-                raise HydroDSArgumentException('keywords must be a list')
-            keywords = ','.join(keywords)
-            payload['keywords'] = keywords
-
-        # download the file from HydroDS
-        # get the file name from the url_file_path
-        file_name = file_url_path.split('/')[-1]
-        download_path = os.path.join(local_download_directory, file_name)
-        try:
-            self.download_file(file_url_path=file_url_path, save_as=download_path)
-        except Exception as ex:
-            raise HydroDSException("Failed to download the file from HydroDS.{message}".format(message=ex.message))
-        files = {'file': open(download_path, 'rb')}
-        # create a resource in HydroShare
-        response = self.requests.post(hs_url+'/?format=json', data=payload, files=files, auth=self.hydroshare_auth)
-
-        # TODO: delete the downloaded file
-        if response.ok:
-            response_content_dict = json.loads(response.content)
-            return response_content_dict
-        else:
-            # TODO: generate more specific exception based on the specific response status code
-            raise HydroDSException("Failed to create a resource in HydroShare.{reason}".format(reason=response.reason))
 
     ## TOPNET
     def download_streamflow(self, usgs_gage, start_year, end_year, output_streamflow=None, save_as=None):

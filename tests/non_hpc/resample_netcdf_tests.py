@@ -14,7 +14,6 @@ input_netcdf_url_path = 'http://hydro-ds.uwrl.usu.edu:20199/files/data/user_2/pr
 ref_netcdf_url_path = 'http://hydro-ds.uwrl.usu.edu:20199/files/data/user_2/SpawnWS_yrev.nc'
 
 try:
-    # param: output_netcdf is optional
     response_data = hds.resample_netcdf(input_netcdf_url_path=input_netcdf_url_path,
                                         ref_netcdf_url_path=ref_netcdf_url_path, variable_name='prcp',
                                         output_netcdf='resample_to_ref_prcp_spwan_3.nc')

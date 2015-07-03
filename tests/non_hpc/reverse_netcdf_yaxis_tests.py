@@ -12,7 +12,6 @@ hds = HydroDS(username=settings.USER_NAME, password=settings.PASSWORD)
 input_netcdf_url = 'http://hydro-ds.uwrl.usu.edu:20199/files/data/user_2/resample.nc'
 
 try:
-    # param: output_netcdf: is optional
     # param: save_as: is optional (use this to download the output file to the specified directory)
     response_data = hds.reverse_netcdf_yaxis(input_netcdf_url_path=input_netcdf_url,
                                              output_netcdf='resample_reverse_yaxis.nc')

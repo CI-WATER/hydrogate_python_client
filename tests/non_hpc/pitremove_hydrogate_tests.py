@@ -48,8 +48,8 @@ else:
 if job_status:
     if job_status == 'JobOutputFileTransferDone':
         # user needs to authenticate to iRODS to be able to download the pitremove output file
-        client.authenticate_user(username='rods', password='ciwater80')
-        client.download_file(file_url_path=submit_job_request.file_path, save_as=r'E:\Scratch\HydroGateClientDemo\pitremove_5.zip')
+        client.irods_authenticate(username='rods', password='ciwater80')
+        client.hydrogate_download_file(file_url_path=submit_job_request.file_path, save_as=r'E:\Scratch\HydroGateClientDemo\pitremove_5.zip')
     else:
         print "Output file is not yet available for download."
 

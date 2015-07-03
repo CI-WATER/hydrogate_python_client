@@ -7,9 +7,10 @@ import settings
 
 # Create HydroDS object passing user login account for HydroDS api server
 hds = HydroDS(username=settings.USER_NAME, password=settings.PASSWORD)
-
+#my_file_to_upload = 'E:\Scratch\param-test-pk.dat'
+my_file_to_upload = 'E:\Scratch\LittleBear1000.zip'
 try:
-    response_data = hds.upload_file(file_to_upload='E:\Scratch\param-test-pk.dat')
+    response_data = hds.upload_file(file_to_upload=my_file_to_upload)
     uploaded_file_url = response_data
 
     # print the url path for the uploaded file
