@@ -817,10 +817,12 @@ class HydroDS(object):
         if save_as:
             self._validate_file_save_as(save_as)
 
+        if not self._is_file_name_valid(output_netcdf, ext='.nc'):
+            raise HydroDSArgumentException("{file_name} is not a valid netcdf file".format(file_name=output_netcdf))
+
         url = self._get_dataservice_specific_url('getcanopyvariable')
-        payload = {"in_NLCDraster": input_NLCD_raster_url_path, 'variable_name': variable_name}
-        self._is_file_name_valid(output_netcdf, ext='.nc')
-        payload['output_netcdf'] = output_netcdf
+        payload = {"in_NLCDraster": input_NLCD_raster_url_path, 'variable_name': variable_name,
+                   'output_netcdf': output_netcdf}
 
         response = self._make_data_service_request(url=url, params=payload)
         return self._process_dataservice_response(response, save_as=save_as)
@@ -830,25 +832,24 @@ class HydroDS(object):
     def get_canopy_variables(self, input_NLCD_raster_url_path, output_ccNetCDF=None, output_hcanNetCDF=None,
                              output_laiNetCDF=None):
 
-        #URL: http://hostname/api/dataservice/getcanopyvariables?in_NLCDraster=http://hostname/
-        # files/data/user_2/nlncd_spwan_proj_clip.tif
-
-        # call with 3 output file names provided:
-        #URL: http://hostname/api/dataservice/getcanopyvariables?in_NLCDraster=http://hostname/files
-        # /data/user_2/nlncd_spwan_proj_clip.tif&out_ccNetCDF=cc_1.nc&out_hcanNetCDF=hcan_1.nc&out_laiNetCDF=lai_1.nc
-
         url = self._get_dataservice_specific_url('getcanopyvariables')
         payload = {"in_NLCDraster": input_NLCD_raster_url_path}
         if output_ccNetCDF:
-            self._validate_output_netcdf_file_name(output_ccNetCDF)
+            if not self._is_file_name_valid(output_ccNetCDF, ext='.nc'):
+                raise HydroDSArgumentException("{file_name} is not a valid netcdf file".format(
+                    file_name=output_ccNetCDF))
             payload['out_ccNetCDF'] = output_ccNetCDF
 
         if output_hcanNetCDF:
-            self._validate_output_netcdf_file_name(output_hcanNetCDF)
+            if not self._is_file_name_valid(output_hcanNetCDF, ext='.nc'):
+                raise HydroDSArgumentException("{file_name} is not a valid netcdf file".format(
+                    file_name=output_hcanNetCDF))
             payload['out_hcanNetCDF'] = output_hcanNetCDF
 
         if output_laiNetCDF:
-            self._validate_output_netcdf_file_name(output_laiNetCDF)
+            if not self._is_file_name_valid(output_laiNetCDF, ext='.nc'):
+                raise HydroDSArgumentException("{file_name} is not a valid netcdf file".format(
+                    file_name=output_laiNetCDF))
             payload['out_laiNetCDF'] = output_laiNetCDF
 
         response = self._make_data_service_request(url=url, params=payload)
@@ -884,10 +885,13 @@ class HydroDS(object):
         if save_as:
             self._validate_file_save_as(save_as)
 
+        if not self._is_file_name_valid(output_raster, ext='.tif'):
+            raise HydroDSArgumentException('{file_name} is not a valid raster file '
+                                           'name.'.format(file_name=output_raster))
+
         url = self._get_dataservice_specific_url('combinerasters')
-        payload = {"input_raster1": input_one_raster_url_path, "input_raster2": input_two_raster_url_path}
-        self._validate_output_raster_file_name(output_raster)
-        payload['output_raster'] = output_raster
+        payload = {"input_raster1": input_one_raster_url_path, "input_raster2": input_two_raster_url_path,
+                   'output_raster': output_raster}
 
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
@@ -961,15 +965,15 @@ class HydroDS(object):
         response = self.requests.get(url, params=payload)
         return self._process_service_response(response, "get_daymet_tile", save_as)
 
-    def reverse_netcdf_yaxis(self, input_netcdf_url_path, output_netcdf=None, save_as=None):
+    def reverse_netcdf_yaxis(self, input_netcdf_url_path, output_netcdf, save_as=None):
         if save_as:
             self._validate_file_save_as(save_as)
 
+        if not self._is_file_name_valid(output_netcdf, ext='.nc'):
+            raise HydroDSArgumentException("{file_name} is not a valid netcdf file".format(file_name=output_netcdf))
+
         url = self._get_dataservice_specific_url('reversenetcdfyaxis')
-        payload = {"input_netcdf": input_netcdf_url_path}
-        if output_netcdf:
-            self._validate_output_netcdf_file_name(output_netcdf)
-            payload['output_netcdf'] = output_netcdf
+        payload = {"input_netcdf": input_netcdf_url_path, 'output_netcdf': output_netcdf}
 
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
@@ -1022,7 +1026,7 @@ class HydroDS(object):
         response = self.requests.get(url, params=payload)
         return self._process_service_response(response, "combine_netcdf", save_as)
 
-    def subset_netcdf(self, input_netcdf, ref_raster_url_path, output_netcdf=None, save_as=None):
+    def subset_netcdf(self, input_netcdf, ref_raster_url_path, output_netcdf, save_as=None):
         """
         :param input_netcdf: This can be either just a file name in which case this will be treated as a static data file
                              on the server or a url file path
@@ -1037,11 +1041,12 @@ class HydroDS(object):
         if save_as:
             self._validate_file_save_as(save_as)
 
+        if not self._is_file_name_valid(output_netcdf, ext='.nc'):
+            raise HydroDSArgumentException("{file_name} is not a valid netcdf file".format(file_name=output_netcdf))
+
         url = self._get_dataservice_specific_url('subsetnetcdftoreference')
-        payload = {"input_netcdf": input_netcdf, 'reference_raster': ref_raster_url_path}
-        if output_netcdf:
-            self._validate_output_netcdf_file_name(output_netcdf)
-            payload['output_netcdf'] = output_netcdf
+        payload = {"input_netcdf": input_netcdf, 'reference_raster': ref_raster_url_path,
+                   'output_netcdf': output_netcdf}
 
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
@@ -1204,8 +1209,8 @@ class HydroDS(object):
         """
         Joins two netcdf files to create a new netcdf file
 
-        :param input_netcdf1_url_path: url file path for the 1st netcdf file on HydroDS api server
-        :param input_netcdf2_url_path: url file path for the 2nd netcdf file on HydroDS api server
+        :param input_netcdf1_url_path: url file path for the 1st netcdf file (user owned) on HydroDS
+        :param input_netcdf2_url_path: url file path for the 2nd netcdf file (user owned) on HydroDS
         :param output_netcdf: name of the output (concatenated) netcdf file
         :param save_as: (optional) file name and file path to save the generated concatenated netcdf file locally
         :return: a dictionary with key 'output_netcdf' and value of url path for the joined netcdf file
@@ -1231,10 +1236,12 @@ class HydroDS(object):
         if save_as:
             self._validate_file_save_as(save_as)
 
+        if not self._is_file_name_valid(output_netcdf, ext='.nc'):
+            raise HydroDSArgumentException("{file_name} is not a valid netcdf file".format(file_name=output_netcdf))
+
         url = self._get_dataservice_specific_url('concatenatenetcdf')
-        payload = {"input_netcdf1": input_netcdf1_url_path, "input_netcdf2": input_netcdf2_url_path}
-        self._validate_output_netcdf_file_name(output_netcdf)
-        payload['output_netcdf'] = output_netcdf
+        payload = {"input_netcdf1": input_netcdf1_url_path, "input_netcdf2": input_netcdf2_url_path,
+                   'output_netcdf': output_netcdf}
 
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
@@ -1267,10 +1274,12 @@ class HydroDS(object):
         if save_as:
             self._validate_file_save_as(save_as)
 
+        if not self._is_file_name_valid(output_raster, ext='.tif'):
+            raise HydroDSArgumentException('{file_name} is not a valid raster file '
+                                           'name.'.format(file_name=output_raster))
+
         url = self._get_dataservice_specific_url('projectraster')
-        payload = {"input_raster": input_raster_url_path, 'utmZone': utm_zone}
-        self._validate_output_raster_file_name(output_raster)
-        payload['output_raster'] = output_raster
+        payload = {"input_raster": input_raster_url_path, 'utmZone': utm_zone, 'output_raster': output_raster}
 
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
@@ -1450,6 +1459,7 @@ class HydroDS(object):
         """
         if save_as:
             self._validate_file_save_as(save_as)
+
         if not self._is_file_name_valid(output_raster, ext='.tif'):
             raise HydroDSArgumentException("{file_name} is not a valid raster file name".format(file_name=output_raster))
 
@@ -1495,23 +1505,20 @@ class HydroDS(object):
         response = self._make_data_service_request(url=url, params=payload)
         return self._process_dataservice_response(response, save_as)
 
-    def resample_raster(self, input_raster_url_path, cell_size_dx, cell_size_dy, resample=None, output_raster=None, save_as=None):
+    def resample_raster(self, input_raster_url_path, cell_size_dx, cell_size_dy, output_raster, resample='bilinear',
+                        save_as=None):
         if save_as:
             self._validate_file_save_as(save_as)
 
-        # example: http://129.123.41.184:20199/api/dataservice/resampleraster?dx=50&dy=50&
-        # input_raster=http://129.123.41.184:20199/files/data/user_2/projected.tif
+        if not self._is_file_name_valid(output_raster, ext='.tif'):
+            raise HydroDSArgumentException("{file_name} is not a valid raster file name".format(file_name=output_raster))
+
+        resample = resample.lower()
+        self._validate_resample_input(resample)
 
         url = self._get_dataservice_specific_url('resampleraster')
-        payload = {"input_raster": input_raster_url_path, 'dx': cell_size_dx, 'dy': cell_size_dy}
-        if resample:
-            resample = resample.lower()
-            self._validate_resample_input(resample)
-            payload['resample'] = resample
-
-        if output_raster:
-            self._validate_output_raster_file_name(output_raster)
-            payload['output_raster'] = output_raster
+        payload = {"input_raster": input_raster_url_path, 'dx': cell_size_dx, 'dy': cell_size_dy, 'resample': resample,
+                   'output_raster': output_raster}
 
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
@@ -1706,7 +1713,7 @@ class HydroDS(object):
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
 
-    def resample_netcdf(self, input_netcdf_url_path, ref_netcdf_url_path, variable_name, output_netcdf=None,
+    def resample_netcdf(self, input_netcdf_url_path, ref_netcdf_url_path, variable_name, output_netcdf,
                         save_as=None):
         """
         :param input_netcdf_url_path: url file path to netcdf file on the api server which needs to be resampled
@@ -1724,12 +1731,12 @@ class HydroDS(object):
         if save_as:
             self._validate_file_save_as(save_as)
 
+        if not self._is_file_name_valid(output_netcdf, ext='.nc'):
+            raise HydroDSArgumentException("{file_name} is not a valid netcdf file".format(file_name=output_netcdf))
+
         url = self._get_dataservice_specific_url('resamplenetcdftoreferencenetcdf')
         payload = {"input_netcdf": input_netcdf_url_path, 'reference_netcdf': ref_netcdf_url_path,
-                   'variable_name': variable_name}
-        if output_netcdf:
-            self._validate_output_netcdf_file_name(output_netcdf)
-            payload['output_netcdf'] = output_netcdf
+                   'variable_name': variable_name, 'output_netcdf': output_netcdf}
 
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
@@ -2116,17 +2123,6 @@ class HydroDS(object):
 
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
-
-
-    def _validate_output_raster_file_name(self, file_name):
-        err_msg = "Invalid output raster file name:{file_name}".format(file_name=file_name)
-        if len(file_name.strip()) < 5 or not file_name.endswith('.tif'):
-            raise HydroDSArgumentException(err_msg)
-
-    def _validate_output_netcdf_file_name(self, file_name):
-        err_msg = "Invalid output netcdf file name:{file_name}".format(file_name=file_name)
-        if len(file_name.strip()) < 4 or not file_name.endswith('.nc'):
-            raise HydroDSArgumentException(err_msg)
 
     def _validate_resample_input(self, resample):
         allowed_options = ('near', 'bilinear', 'cubic', 'cubicspline', 'lanczos', 'average', 'mode', 'max', 'min',
