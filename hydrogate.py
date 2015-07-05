@@ -1686,14 +1686,14 @@ class HydroDS(object):
                     raise HydroDSArgumentException("A value for epsg_code must be an integer")
 
         if input_outlet_shapefile_url_path:
-            url = self._get_dataservice_specific_url(service_name='delineatewatershedatshapefile')
-            payload = {'streamThreshold': threshold, 'input_DEM_raster': input_raster_url_path,
+            url = self._get_dataservice_specific_url(service_name='delineatewatershedatshape')
+            payload = {'stream_threshold': threshold, 'input_DEM_raster': input_raster_url_path,
                        'input_outlet_shapefile': input_outlet_shapefile_url_path,
                        'output_raster': output_raster, 'output_outlet_shapefile': output_outlet_shapefile}
         else:
-            url = self._get_dataservice_specific_url(service_name='delineatewatershed')
-            payload = {'epsgCode': epsg_code, 'streamThreshold': threshold, 'outletPointX': outlet_point_x,
-                       'outletPointY': outlet_point_y, "input_DEM_raster": input_raster_url_path,
+            url = self._get_dataservice_specific_url(service_name='delineatewatershedatxy')
+            payload = {'epsg_code': epsg_code, 'stream_threshold': threshold, 'outlet_point_x': outlet_point_x,
+                       'outlet_point_y': outlet_point_y, "input_DEM_raster": input_raster_url_path,
                        "output_raster": output_raster, 'output_outlet_shapefile': output_outlet_shapefile}
 
         response = self._make_data_service_request(url=url, params=payload)
