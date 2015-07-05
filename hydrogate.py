@@ -1142,7 +1142,7 @@ class HydroDS(object):
         Subset netcdf data based on a reference raster
 
         :param input_netcdf: either a file name for a supported netcdf data resource (static data file) on HydroDS api server
-                             on url file path for a netcd file that the user owns on the HydroDS server
+                             or url file path for a netcd file that the user owns on the HydroDS server
         :type input_netcdf: string
         :param ref_raster_url_path: url file path for a raster file (user owned) on the HydroDS api server that needs
                                     to be used as a reference for subsetting
@@ -1184,7 +1184,7 @@ class HydroDS(object):
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
 
-    def subset_netcdf_by_time(self, input_netcdf_url_path, time_dimension_name, start_time_index, end_time_index,
+    def subset_netcdf_by_time(self, input_netcdf_url_path, time_dimension_name, start_date, end_date,
                               output_netcdf, save_as=None):
         """
         Subset a netcdf file by time dimension
@@ -1193,10 +1193,10 @@ class HydroDS(object):
         :type input_netcdf_url_path: string
         :param time_dimension_name: name of time dimension variable in the input netcdf file
         :type time_dimension_name: string
-        :param start_time_index: start time for subsetting
-        :type start_time_index: integer
-        :param end_time_index: end time for subsetting
-        :type end_time_index: integer
+        :param start_date: data start date for subsetting
+        :type start_date: string (must be of format: 'mm/dd/yyyy')
+        :param end_date: date end date for subsetting
+        :type end_date: string (must be of format: 'mm/dd/yyyy')
         :param output_netcdf: name for the output (subsetted) netcdf file (if there is file already with the same name
                               it will be overwritten)
         :type output_netcdf: string
@@ -1213,29 +1213,34 @@ class HydroDS(object):
         Example usage:
             hds = HydroDS(username=your_username, password=your_password)
             response_data = hds.subset_netcdf_by_time(input_netcdf_url_path=your_input_netcdf_url_path_here,
-                                                      time_dimension_name='time', start_time_index=1, end_time_index=10,
+                                                      time_dimension_name='time', start_date='01/01/2010',
+                                                      end_date='01/11/2010',
                                                       output_netcdf='subset_prcp_spwan_1_to_10_days.nc')
+
             output_subset_netcdf_url = response_data['output_netcdf']
 
             # print the url path for the generated netcdf file
             print(output_subset_netcdf_url)
         """
-
+        DATE_FORMAT = "%m/%d/%Y"
         if save_as:
             self._validate_file_save_as(save_as)
 
         try:
-            int(start_time_index)
-        except TypeError:
-            raise HydroDSArgumentException("Value for start_time_index must be an integer")
+            start_date_value = datetime.datetime.strptime(start_date, DATE_FORMAT)
+        except ValueError:
+            raise HydroDSArgumentException("start_date must be a string in the format of 'mm/dd/yyyy'")
 
         try:
-            int(end_time_index)
-        except TypeError:
-            raise HydroDSArgumentException("Value for end_time_index must be an integer")
+            end_date_value = datetime.datetime.strptime(end_date, DATE_FORMAT)
+        except ValueError:
+            raise HydroDSArgumentException("end_date must be a string in the format of 'mm/dd/yyyy'")
 
-        if start_time_index > end_time_index:
-            raise HydroDSArgumentException("start_time_index must be smaller than end_time_index")
+        if start_date_value > end_date_value:
+            raise HydroDSArgumentException("start_date must be a date before the end_date")
+
+        start_time_index = start_date_value.day
+        end_time_index = start_date_value.day + (end_date_value - start_date_value).days
 
         if not self._is_file_name_valid(output_netcdf, ext='.nc'):
             raise HydroDSArgumentException('{file_name} is not a valid NetCDF file '
