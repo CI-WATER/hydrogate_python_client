@@ -532,7 +532,7 @@ class HydroDS(object):
             print(output_subset_dem_url)
         """
 
-        url = self._get_dataservice_specific_url(service_name='rastersubset')
+        url = self._get_dataservice_specific_url(service_name='subsetrastertobbox')
         if save_as:
             self._validate_file_save_as(save_as)
 
