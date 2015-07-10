@@ -1133,6 +1133,61 @@ class HydroDS(object):
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
 
+    def netcdf_rename_variable(self, input_netcdf_url_path, output_netcdf, input_variable_name=None,
+                               output_variable_name=None, save_as=None):
+        """
+        Rename netcdf variable
+
+        :param input_netcdf_url_path: url file path for a netcdf file (user owned) on the HydroDS api server for which
+                                      variable to be renamed
+        :type input_netcdf_url_path: string
+        :param output_netcdf: name for the output netcdf file (if there is file already with the same name it will be
+                              overwritten)
+        :type output_netcdf: string
+        :param input_variable_name: (optional) name of the variable in the input netcdf file
+        :type input_variable_name: string
+        :param output_variable_name: (optional) new name for the variable
+        :type output_variable_name: string
+        :param save_as: (optional) file name and file path to save the generated netcdf file locally
+        :type save_as: string
+        :return: a dictionary with key 'output_netcdf' and value of url path for the output netcdf file
+
+        :raises: HydroDSArgumentException: one or more argument failed validation at client side
+        :raises: HydroDSBadRequestException: one or more argument failed validation on the server side
+        :raises: HydroDSNotAuthenticatedException: provided user account failed validation
+        :raises: HydroDSNotAuthorizedException: user making this request is not authorized to do so
+        :raises: HydroDSNotFoundException: specified netcdf input file doesn't exist on HydroDS server
+
+        Example usage:
+            hds = HydroDS(username=your_username, password=your_password)
+            response_data = hds.netcdf_rename_variable(input_netcdf_url_path=provide_input_netcdf_url,
+                                                       input_variable_name='Band1', output_variable_name='Band1',
+                                                       output_netcdf='rename_variable.nc')
+
+            output_rename_netcdf_url = response_data['output_netcdf']
+
+            # print the url path for the generated netcdf file
+            print(output_rename_netcdf_url)
+        """
+        if save_as:
+            self._validate_file_save_as(save_as)
+
+        url = self._get_dataservice_specific_url('netcdfrenamevariable')
+        payload = {"input_netcdf": input_netcdf_url_path}
+        if input_variable_name:
+            payload['input_varname'] = input_variable_name
+
+        if output_variable_name:
+            payload['output_varname'] = output_variable_name
+
+        if not self._is_file_name_valid(output_netcdf, ext='.nc'):
+            raise HydroDSArgumentException("{file_name} is not a valid netcdf file name".format(file_name=output_netcdf))
+
+        payload['output_netcdf'] = output_netcdf
+
+        response = self._make_data_service_request(url, params=payload)
+        return self._process_dataservice_response(response, save_as)
+
     # TODO: this method has been replaced by the concatenate_netcdf method - need to delete this one
     def combine_netcdf(self, input_one_netcdf_url_path, input_two_netcdf_url_path, save_as=None):
         """
@@ -2288,7 +2343,7 @@ class HydroDS(object):
 
         if not self.hydroshare_auth:
             raise HydroDSNotAuthenticatedException("You don't have access to HydroShare. Set your HydroShare login account "
-                                                   "using the function set_hydroshare_account()")
+                                                   "using the function 'set_hydroshare_account()'")
 
         url = self._get_dataservice_specific_url('hydroshare/createresource')
         payload = {'file_name': file_name, 'resource_type': resource_type, 'hs_username': self.hydroshare_auth[0],
@@ -2377,7 +2432,7 @@ class HydroDS(object):
             else:
                 raise HydroDSException("HydroDS Service Error. {response_err}".format(response_err=err_message))
 
-        response_dict = response.json() # json.loads(response.content)
+        response_dict = response.json()
         if response_dict['success']:
             if save_as:
                 if len(response_dict['data']) != 1:
