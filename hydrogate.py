@@ -9,7 +9,6 @@ import json
 import pickle
 import datetime
 
-# TODO: create a custom Exception class
 class HydroDSException(Exception):
     pass
 
@@ -73,14 +72,9 @@ class HydroDS(object):
 
     def check_irods_server_status(self):
         url = '/server'
-        # headers = {'content-type': 'application/json'}
-        # response_format = {'contentType': 'application/json'}
-        # response = self.requests.get(url, params=response_format, headers=headers, auth=(self.username, self.password))
         response = self._make_irods_rest_call(url)
         if response.status_code != requests.codes.ok:
-            raise Exception("Error: iRODS server connection error." + response.reason)
-
-        print response.content
+            raise Exception("iRODS server connection error." + response.reason + " " + response.content)
 
     def get_irods_collections(self, listing=False):
         url ='/collection//usu/home/rods'
@@ -89,15 +83,18 @@ class HydroDS(object):
 
         response = self._make_irods_rest_call(url)
         if response.status_code != requests.codes.ok:
-            raise Exception("Error:" + response.reason)
-
-        print response.content
+            raise Exception("iRODS error:" + response.reason + " " + response.content)
 
     def _make_irods_rest_call(self, url):
         url = self.irods_rest_base_url + url
         headers = {'content-type': 'application/json'}
         response_format = {'contentType': 'application/json'}
-        response = self.requests.get(url, params=response_format, headers=headers, auth=(self.irods_username, self.irods_password))
+        try:
+            response = self.requests.get(url, params=response_format, headers=headers, auth=(self.irods_username,
+                                                                                             self.irods_password))
+        except Exception as ex:
+           raise Exception("iRODS error." + response.reason + " " + response.content)
+
         return response
 
     def login(self, username=None, password=None, hpc_username=None, hpc_password=None, hpc='USU'):
@@ -116,9 +113,8 @@ class HydroDS(object):
                 self.get_token()
                 self.requests.auth.HTTPBasicAuth(self.username, self.password)
                 self.user_hpc_authenticated = True
-                print("Login successful.")
-            except:
-                print("Login failed.")
+            except Exception as ex:
+                raise Exception("Failed to login." + ex.message)
 
     def hpc_authenticate(self, username, password, hpc='USU'):
         if hpc in self.get_available_hpc():
@@ -150,21 +146,16 @@ class HydroDS(object):
                     self.get_token()
                     self.user_hpc_authenticated = True
                     self.default_hpc = hpc
-                    print("User authentication for HPC successful.")
-                except:
-                    print("User authentication for HPC failed.")
+                except Exception:
+                    raise Exception("User authentication for HPC failed." + ex.message)
             else:
                 raise Exception("User authentication for HPC failed. Provided HPC (%s) is not supported." % hpc)
         else:
             self.irods_username = username
             self.irods_password = password
             self.user_irods_authenticated = False
-            try:
-                self.check_irods_server_status()
-                self.user_irods_authenticated = True
-                print("User authentication for iRODS is successful.")
-            except:
-                raise Exception ("User authentication for iRODS failed.")
+            self.check_irods_server_status()
+            self.user_irods_authenticated = True
 
     def get_available_hpc(self):
         return ('USU', 'HydrogateHPC')
@@ -262,13 +253,7 @@ class HydroDS(object):
         _ServiceLog.print_log(order=order, count=count)
 
     def get_most_recent_request(self, service_name=None, service_id_name=None, service_id_value=None):
-        last_request = _ServiceLog.get_most_recent_request(service_name, service_id_name, service_id_value)
-        if last_request:
-            print last_request.to_json()
-        else:
-            print ("No matching request was found.")
-
-        return last_request
+        return _ServiceLog.get_most_recent_request(service_name, service_id_name, service_id_value)
 
     def upload_package(self, package_file_url_path):
         self._check_user_hpc_authentication()
@@ -294,19 +279,15 @@ class HydroDS(object):
                                          service_id_value=package_id, service_status='success')
             _ServiceLog.add(service_req)
             self.save_service_call_history()
-            print("Package upload request successful. Package ID:%s" % package_id)
-            #print json.dumps(response.content, indent=4)
-            print(service_req.to_json())
             return service_req
         else:
-            raise Exception('Error:%s' % response_dict['description'])
+            raise Exception('Error in uploading the package:%s' % response_dict['description'])
 
     def get_upload_status(self, package_id=None):
         if not package_id:
             # TODO: get the most recent service request object that has a package id
             last_request = _ServiceLog.get_most_recent_request(service_id_name='packageID')
             if not last_request:
-                print("No package upload request has been made yet to check status.")
                 return None
             else:
                 package_id = last_request.service_id_value
@@ -320,7 +301,7 @@ class HydroDS(object):
         request_data = {'token': self.token, 'packageid': int(package_id)}
         response = self.requests.get(self.upload_pkg_status_url, params=request_data, verify=False)
         if response.status_code != requests.codes.ok:
-            raise Exception("Error: HydroGate connection error.")
+            raise Exception("HydroGate error." + response.reason + " " + response.content)
 
         response_dict = json.loads(response.content)
         if response_dict['status'] == 'success':
@@ -329,10 +310,9 @@ class HydroDS(object):
                                          service_id_value=package_id, service_status=upload_status)
             _ServiceLog.add(service_req)
             self.save_service_call_history()
-            print(service_req.to_json())
             return service_req
         else:
-            raise Exception('Error:' + response_dict['description'])
+            raise Exception('HydroGate error:' + response_dict['description'])
 
     def submit_job(self, package_id, program_name, input_raster_file_name=None, **kwargs):
        # TODO: check that the user provided program_name is one of the supported programs using the get_available_programs()
@@ -352,11 +332,13 @@ class HydroDS(object):
                 job_def['walltime'] = '00:00:50'
                 job_def['outputlist'] = ['fel*.tif']
                 job_def['parameters'] = {'z': input_raster_file_name, 'fel': 'feloutput.tif'}
-            elif program_name == 'ueb':
-                job_def['program'] = 'ueb'
+            elif program_name == 'uebpar':
+                job_def['program'] = 'uebpar'
                 job_def['walltime'] = '00:59:50'
                 job_def['outputlist'] = ['SWE.nc', 'aggout.nc', 'SWIT.nc', 'SWISM.nc']
-                job_def['parameters'] = {'wdir': './', 'control': 'control.dat'}
+                #job_def['parameters'] = {'wdir': './'}
+                #job_def['runner_param'] = "-wdir .hydrogate/data/ea132802-24fe-11e5-9d14-0050569b33c6/JOB_91/LiitleBear1000"
+                job_def['parameters'] = {'wdir': './' , 'control': 'control.dat'}
             else:
                 raise Exception("Program parameters are missing for '%s'." % program_name)
 
@@ -372,13 +354,10 @@ class HydroDS(object):
             service_req = ServiceRequest(service_name='submit_job', service_id_name='jobID',
                                          service_id_value=job_id, service_status='success', file_path=output_file_path)
             _ServiceLog.add(service_req)
-            print("Job submission successful.")
             self.save_service_call_history()
-            #print json.dumps(response.content, indent=4)
-            print(service_req.to_json())
             return service_req
         else:
-            raise Exception('Error:%s' % response_dict['description'])
+            raise Exception('HydroGate error:%s' % response_dict['description'])
 
     def get_job_status(self, job_id):
         self._check_user_hpc_authentication()
@@ -389,7 +368,7 @@ class HydroDS(object):
         request_data = {'token': self.token, 'jobid': job_id}
         response = self.requests.get(self.job_status_url, params=request_data, verify=False)
         if response.status_code != requests.codes.ok:
-            raise Exception("Error: HydroGate connection error.")
+            raise Exception("HydroGate error." + response.reason + " " + response.content)
 
         response_dict = json.loads(response.content)
         if response_dict['status'] == 'success':
@@ -398,11 +377,9 @@ class HydroDS(object):
                                          service_id_value=job_id, service_status=job_status)
             _ServiceLog.add(service_req)
             self.save_service_call_history()
-            print("Job status for job ID:%s is %s." % (job_id, job_status))
-            print(service_req.to_json())
             return job_status
         else:
-            raise Exception('Error:%s' % response_dict['description'])
+            raise Exception('HydroGate error:%s' % response_dict['description'])
 
     def list_my_files(self):
         """
@@ -625,8 +602,8 @@ class HydroDS(object):
         response = self._make_data_service_request(url=url, params=payload)
         return self._process_dataservice_response(response, save_as)
 
-    def raster_to_netcdf(self, input_raster_url_path, output_netcdf, increasing_x=False, increasing_y=False,
-                         output_varname='Band1', save_as=None):
+    def raster_to_netcdf_and_rename_variable(self, input_raster_url_path, output_netcdf, increasing_x=False,
+                                             increasing_y=False, output_varname='Band1', save_as=None):
         """
         Generate a netcdf file from a raster file (convert data in raster format to netcdf format)
         Additionally reorder netcdf data in the direction of increasing X-coordinate and/or increasing Y-coordinate
@@ -638,10 +615,12 @@ class HydroDS(object):
         :param output_netcdf: name for the generated netcdf file (if there is file already with the same name it will be
                               overwritten)
         :type output_netcdf: string
-        :param increasing_x: If data in netcdf format to be ordered in the direction of increasing X-coordinate
+        :param increasing_x: if data in netcdf format to be ordered in the direction of increasing X-coordinate
         :type increasing_x: bool
-        :param increasing_y: If data in netcdf format to be ordered in the direction of increasing Y-coordinate
+        :param increasing_y: if data in netcdf format to be ordered in the direction of increasing Y-coordinate
         :type increasing_y: bool
+        :param output_varname: name for the output NetCDF data variable
+        :type output_varname: string
         :param save_as: (optional) file name and file path to save the generated netcdf file locally
         :type save_as: string
         :return: a dictionary with key 'output_netcdf' and value of url path for the generated netcdf file
@@ -654,7 +633,7 @@ class HydroDS(object):
 
         Example usage:
             hds = HydroDS(username=your_username, password=your_password)
-            response_data = hds.raster_to_netcdf(input_raster_url_path=provide_input_raster_url_path_here,
+            response_data = hds.raster_to_netcdf_and_rename_variable(input_raster_url_path=provide_input_raster_url_path_here,
                                                  increasing_y=True, output_netcdf='raster_to_netcdf_slope_logan.nc')
 
             output_netcdf_url = response_data['output_netcdf']
@@ -676,9 +655,53 @@ class HydroDS(object):
         if not isinstance(increasing_y, bool):
             raise HydroDSArgumentException("increasing_y must be a boolean value")
 
-        url = self._get_dataservice_specific_url('rastertonetcdf')
+        url = self._get_dataservice_specific_url('rastertonetcdfrenamevariable')
         payload = {"input_raster": input_raster_url_path, 'output_netcdf': output_netcdf, 'increasing_x': increasing_x,
                    'increasing_y': increasing_y, 'output_varname': output_varname}
+
+        response = self._make_data_service_request(url, params=payload)
+        return self._process_dataservice_response(response, save_as)
+
+    def raster_to_netcdf(self, input_raster_url_path, output_netcdf, save_as=None):
+        """
+        Generate a netcdf file from a raster file (convert data in raster format to netcdf format)
+
+        :param input_raster_url_path: url file path for the (user owned) raster on HydroDS api server to be used for
+                                      generating a netcdf file
+        :type input_raster_url_path: string
+        :param output_netcdf: name for the generated netcdf file (if there is file already with the same name it will be
+                              overwritten)
+        :type output_netcdf: string
+        :param save_as: (optional) file name and file path to save the generated netcdf file locally
+        :type save_as: string
+        :return: a dictionary with key 'output_netcdf' and value of url path for the generated netcdf file
+
+        :raises: HydroDSArgumentException: one or more argument failed validation at client side
+        :raises: HydroDSBadRequestException: one or more argument failed validation on the server side
+        :raises: HydroDSNotAuthenticatedException: provided user account failed validation
+        :raises: HydroDSNotAuthorizedException: user making this request is not authorized to do so
+        :raises: HydroDSNotFoundException: specified raster input file(s) does not exist on the server
+
+        Example usage:
+            hds = HydroDS(username=your_username, password=your_password)
+            response_data = hds.raster_to_netcdf(input_raster_url_path=provide_input_raster_url_path_here,
+                                                 output_netcdf='raster_to_netcdf_slope_logan.nc')
+
+            output_netcdf_url = response_data['output_netcdf']
+
+            # print the url path for the generated netcdf file
+            print(output_netcdf_url)
+        """
+
+        if save_as:
+            self._validate_file_save_as(save_as)
+
+        if not self._is_file_name_valid(output_netcdf, ext='.nc'):
+            raise HydroDSArgumentException('{file_name} is not a valid NetCDF file '
+                                           'name.'.format(file_name=output_netcdf))
+
+        url = self._get_dataservice_specific_url('rastertonetcdf')
+        payload = {"input_raster": input_raster_url_path, 'output_netcdf': output_netcdf}
 
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
@@ -2059,7 +2082,7 @@ class HydroDS(object):
 
     def upload_file_irods(self, file_to_upload):
         if not os.path.isfile(file_to_upload):
-            raise Exception("Error: Specified file to upload (%s) does not exist." % file_to_upload)
+            raise Exception("Upload file error: Specified file to upload (%s) does not exist." % file_to_upload)
 
         file_name = os.path.basename(file_to_upload)
         file_url_path = self.irods_rest_base_url + '/fileContents/usu/home/rods/' + file_name
@@ -2070,17 +2093,14 @@ class HydroDS(object):
                                           headers=headers)
 
         if response.status_code != requests.codes.ok:
-            raise Exception("Error: Failed to upload to iRODS." + response.reason)
+            raise Exception("Failed to upload to iRODS." + response.reason + " " + response.content)
 
         response_dict = json.loads(response.content)
-        print "File upload was successful."
         uploaded_file_path = response_dict['dataPath']
-        print("Uploaded file URL path:%s" % uploaded_file_path)
         service_req = ServiceRequest(service_name='upload_file', service_id_name='',
                                      service_id_value='', service_status='success', file_path=uploaded_file_path)
         _ServiceLog.add(service_req)
         self.save_service_call_history()
-        print(service_req.to_json())
         return service_req
 
     def upload_file(self, file_to_upload):
@@ -2206,7 +2226,7 @@ class HydroDS(object):
 
             if not response.ok:
                 # Something went wrong
-                raise Exception("Error: Error in downloading the file." + response.reason)
+                raise Exception("HydroGate error: Error in downloading the file." + response.reason + " " + response.content)
 
             for block in response.iter_content(1024):
                 if not block:
@@ -2217,8 +2237,6 @@ class HydroDS(object):
                                      service_id_value='', service_status='success', file_path=save_as)
         _ServiceLog.add(service_req)
         self.save_service_call_history()
-        print("Downloaded file saved successfully at:%s" % save_as)
-        print(service_req.to_json())
         return service_req
 
     def set_hydroshare_account(self, username, password):
@@ -2345,18 +2363,19 @@ class HydroDS(object):
 
     def _process_dataservice_response(self, response, save_as=None):
         if response.status_code != requests.codes.ok:
+            err_message = response.reason + " " + response.content
             if response.status_code == 400:
-                raise HydroDSBadRequestException("HydroDS Service Error. {response_err}".format(response_err=response.reason))
+                raise HydroDSBadRequestException("HydroDS Service Error. {response_err}".format(response_err=err_message))
             elif response.status_code == 401:
-                raise HydroDSNotAuthenticatedException("HydroDS Service Error. {response_err}".format(response_err=response.reason))
+                raise HydroDSNotAuthenticatedException("HydroDS Service Error. {response_err}".format(response_err=err_message))
             elif response.status_code == 403:
-                raise HydroDSNotAuthorizedException("HydroDS Service Error. {response_err}".format(response_err=response.reason))
+                raise HydroDSNotAuthorizedException("HydroDS Service Error. {response_err}".format(response_err=err_message))
             elif response.status_code == 404:
-                raise HydroDSNotFoundException("HydroDS Service Error. {response_err}".format(response_err=response.reason))
+                raise HydroDSNotFoundException("HydroDS Service Error. {response_err}".format(response_err=err_message))
             elif response.status_code == 500:
-                raise HydroDSServerException("HydroDS Service Error. {response_err}".format(response_err=response.reason))
+                raise HydroDSServerException("HydroDS Service Error. {response_err}".format(response_err=err_message))
             else:
-                raise HydroDSException("HydroDS Service Error. {response_err}".format(response_err=response.reason))
+                raise HydroDSException("HydroDS Service Error. {response_err}".format(response_err=err_message))
 
         response_dict = response.json() # json.loads(response.content)
         if response_dict['success']:
@@ -2376,8 +2395,6 @@ class HydroDS(object):
         response_dict = json.loads(response.content)
         if response_dict['ret'] == 'success':
             file_url = response_dict['message']
-            print("%s execution was successful.\n" % service_name)
-            print("Output file URL path:%s\n" % file_url)
             service_req = ServiceRequest(service_name=service_name, service_id_name='',
                                          service_id_value='', service_status='success', file_path=file_url)
 
@@ -2389,7 +2406,6 @@ class HydroDS(object):
                     file_url = file_url[:-4]
                 self.download_file(file_url, save_as)
 
-            print(service_req.to_json())
             return service_req
         else:
             self._raise_service_error(response_dict['message'])
@@ -2402,7 +2418,6 @@ class HydroDS(object):
 
     def clear_service_log(self):
         _ServiceLog.delete_all()
-        print ("Service call history deleted.")
 
     def _is_file_name_valid(self, file_name, ext=None):
         try:
@@ -2500,7 +2515,6 @@ class _ServiceLog(object):
     @classmethod
     def print_log(cls, order='first', count=None):
         if len(cls._service_requests) == 0:
-            print ("There are no service requests to display.")
             return
 
         if order == 'last':
@@ -2521,7 +2535,7 @@ class _ServiceLog(object):
 
         service_requests = service_requests[0:count]
         for req in service_requests:
-            print req.to_json()
+            print(req.to_json())
 
     @classmethod
     def get_most_recent_request(cls, service_name=None, service_id_name=None, service_id_value=None):
