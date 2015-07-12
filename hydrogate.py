@@ -1,7 +1,7 @@
 __author__ = 'Pabitra'
 
 """"
-HydroGate Python Client for accessing CI-WATER Data and Computational Web Services
+HydroGate Python Client for accessing CI-WATER HydroDS Data and Computational Web Services
 """
 import requests
 import os
@@ -30,43 +30,50 @@ class HydroDSNotAuthenticatedException(Exception):
 class HydroDSNotFoundException(Exception):
     pass
 
+# TODO: Add HydroGate specific exceptions
+
 def singleton(cls):
     instances = {}
 
-    def getinstance(base_url='https://hydrogate.uwrl.usu.edu/hydrogate', username=None, password=None):
+    def getinstance(username=None, password=None):
         if cls not in instances:
-            instances[cls] = cls(base_url, username, password)
+            instances[cls] = cls(username, password)
         return instances[cls]
     return getinstance
 
 
 @singleton
 class HydroDS(object):
-    def __init__(self, base_url='https://hydrogate.uwrl.usu.edu/hydrogate', username=None, password=None):
-        self.base_url = base_url
-        if self.base_url.endswith('/'):
-            self.base_url = self.base_url.strip('/')
+    def __init__(self, username=None, password=None):
+        """
+        Create HydroDS object to access client api functions
+        :param username: username for HydroDS
+        :param password: password for HydroDS
+        :return: HydroDS object
+        """
 
-        self.hydrogate_base_url = 'https://129.123.41.158/hydrogate'    #http://ckan-fileserver.uwrl.usu.edu/hydrogate
-        self.dataservice_base_url = 'http://hydro-ds.uwrl.usu.edu:20199/api/dataservice'
-        self.irods_rest_base_url = 'http://hydro-ds.uwrl.usu.edu:8080/irods-rest-4.0.2.1-SNAPSHOT/rest'
-        self.token_url = self.hydrogate_base_url + '/request_token/'
-        self.upload_pkg_url = self.hydrogate_base_url + '/upload_package/'
-        self.upload_pkg_status_url = self.hydrogate_base_url + '/retrieve_package_status'
-        self.submit_job_url = self.hydrogate_base_url + '/submit_job/'
-        self.job_status_url = self.hydrogate_base_url + '/retrieve_job_status'
-        self.token_expire_time_url = self.hydrogate_base_url + '/retrieve_token_expire_time'
-        self.hpc_program_names_url = self.hydrogate_base_url + '/return_hpc_program_names/'
-        self.program_info_url = self.hydrogate_base_url + '/retrieve_program_info'
-        self.username = username
-        self.password = password
-        self.requests = requests
-        self.authorization = (username, password)
-        self.hydroshare_auth = None
-        self.hpc_username = None
-        self.hpc_password = None
-        self.default_hpc = 'USU'
-        self.token = None
+        self._hydrogate_base_url = 'https://129.123.41.158/hydrogate'
+        self._dataservice_base_url = 'http://hydro-ds.uwrl.usu.edu:20199/api/dataservice'
+        self._irods_rest_base_url = 'http://hydro-ds.uwrl.usu.edu:8080/irods-rest-4.0.2.1-SNAPSHOT/rest'
+        self._hg_token_url = self._hydrogate_base_url + '/request_token/'
+        self._hg_upload_pkg_url = self._hydrogate_base_url + '/upload_package/'
+        self._hg_upload_pkg_status_url = self._hydrogate_base_url + '/retrieve_package_status'
+        self._hg_submit_job_url = self._hydrogate_base_url + '/submit_job/'
+        self._hg_job_status_url = self._hydrogate_base_url + '/retrieve_job_status'
+        self._hg_token_expire_time_url = self._hydrogate_base_url + '/retrieve_token_expire_time'
+        self._hg_hpc_program_names_url = self._hydrogate_base_url + '/return_hpc_program_names/'
+        self._hg_program_info_url = self._hydrogate_base_url + '/retrieve_program_info'
+        self._requests = requests
+        self._hg_auth = (username, password)
+        self._hydroshare_auth = None
+        self._hg_username = None
+        self._hg_password = None
+        self._default_hpc = 'USU'
+        self._hg_token = None
+        self._user_hg_authenticated = False
+        self._irods_username = None
+        self._irods_password = None
+        self._user_irods_authenticated = False
 
         _ServiceLog.load()
 
@@ -86,47 +93,49 @@ class HydroDS(object):
             raise Exception("iRODS error:" + response.reason + " " + response.content)
 
     def _make_irods_rest_call(self, url):
-        url = self.irods_rest_base_url + url
+        url = self._irods_rest_base_url + url
         headers = {'content-type': 'application/json'}
         response_format = {'contentType': 'application/json'}
         try:
-            response = self.requests.get(url, params=response_format, headers=headers, auth=(self.irods_username,
-                                                                                             self.irods_password))
+            response = self._requests.get(url, params=response_format, headers=headers, auth=(self._irods_username,
+                                                                                             self._irods_password))
         except Exception as ex:
            raise Exception("iRODS error." + response.reason + " " + response.content)
 
         return response
 
-    def login(self, username=None, password=None, hpc_username=None, hpc_password=None, hpc='USU'):
-        self.irods_username = username
-        self.irods_password = password
-        if hpc_username and not hpc_password:
-            raise Exception("Failed to login. Password for hpc system is missing.")
+    # TODO: Not used
+    def login(self, username=None, password=None, hg_username=None, hg_password=None, hpc='USU'):
+        self._irods_username = username
+        self._irods_password = password
+        if hg_username and not hg_password:
+            raise Exception("Failed to login. Password for Hydrogate is missing.")
 
-        if not hpc_username and hpc_password:
-            raise Exception("Failed to login. Username for hpc system is missing.")
+        if not hg_username and hg_password:
+            raise Exception("Failed to login. Username for Hydrogate system is missing.")
 
-        if hpc_username and hpc_password:
-            self.token = None
-            self.user_hpc_authenticated = False
+        if hg_username and hg_password:
+            self._hg_token = None
+            self._user_hg_authenticated = False
+            self._hg_username = hg_username
+            self._hg_password = hg_password
             try:
-                self.get_token()
-                self.requests.auth.HTTPBasicAuth(self.username, self.password)
-                self.user_hpc_authenticated = True
+                self._get_token()
+                self._user_hg_authenticated = True
             except Exception as ex:
-                raise Exception("Failed to login." + ex.message)
+                raise Exception("Failed to login to Hydrogate. " + ex.message)
 
-    def hpc_authenticate(self, username, password, hpc='USU'):
+    def hydrogate_authenticate(self, username, password, hpc='USU'):
         if hpc in self.get_available_hpc():
-            self.token = None
-            self.user_hpc_authenticated = False
-            self.hpc_username = username
-            self.hpc_password = password
+            self._hg_token = None
+            self._user_hg_authenticated = False
+            self._hg_username = username
+            self._hg_password = password
             try:
-                self.requests.auth.HTTPBasicAuth(self.hpc_username, self.hpc_password)
-                self.get_token()
-                self.user_hpc_authenticated = True
-                self.default_hpc = hpc
+                self._requests.auth.HTTPBasicAuth(self._hg_username, self._hg_password)
+                self._get_token()
+                self._user_hg_authenticated = True
+                self._default_hpc = hpc
             except:
                 raise HydroDSNotAuthenticatedException("User authentication failed for HPC:{hpc_system}".format(
                     hpc_system=hpc))
@@ -137,25 +146,26 @@ class HydroDS(object):
     def irods_authenticate(self, username, password, hpc=None):
         if hpc:
             if hpc in self.get_available_hpc():
-                self.token = None
-                self.user_hpc_authenticated = False
-                self.hpc_username = username
-                self.hpc_password = password
+                self._hg_token = None
+                self._user_hg_authenticated = False
+                self._hg_username = username
+                self._hg_password = password
                 try:
-                    self.requests.auth.HTTPBasicAuth(self.hpc_username, self.hpc_password)
-                    self.get_token()
-                    self.user_hpc_authenticated = True
-                    self.default_hpc = hpc
-                except Exception:
-                    raise Exception("User authentication for HPC failed." + ex.message)
+                    self._requests.auth.HTTPBasicAuth(self._hg_username, self._hg_password)
+                    self._get_token()
+                    self._user_hg_authenticated = True
+                    self._default_hpc = hpc
+                except Exception as ex:
+                    raise Exception("User authentication for Hydrogate failed." + ex.message)
             else:
-                raise Exception("User authentication for HPC failed. Provided HPC (%s) is not supported." % hpc)
+                raise Exception("User authentication for Hydrogate failed. Provided HPC system (%s) is not "
+                                "supported." % hpc)
         else:
-            self.irods_username = username
-            self.irods_password = password
-            self.user_irods_authenticated = False
+            self._irods_username = username
+            self._irods_password = password
+            self._user_irods_authenticated = False
             self.check_irods_server_status()
-            self.user_irods_authenticated = True
+            self._user_irods_authenticated = True
 
     def get_available_hpc(self):
         return ('USU', 'HydrogateHPC')
@@ -163,91 +173,89 @@ class HydroDS(object):
     def set_default_hpc(self, hpc):
         available_hpc = self.get_available_hpc()
         if hpc in available_hpc:
-            self.default_hpc = hpc
+            self._default_hpc = hpc
         else:
             raise HydroDSArgumentException("{hpc_system} invalid hpc resource.".format(hpc_system=hpc))
 
     def get_available_programs(self, hpc=None):
         # returns a list of installed program names that are installed on a specified hpc resource
         self._check_user_hpc_authentication()
-        if not self.token:
-            self.get_token()
+        if not self._hg_token:
+            self._get_token()
         else:
-            if self.get_token_expire_time() == 0:
-                self.get_token()
+            if self._get_token_expire_time() == 0:
+                self._get_token()
 
         if not hpc:
-            hpc = self.default_hpc
+            hpc = self._default_hpc
 
-        request_data = {'token': self.token, 'hpc': hpc}
-        response = self.requests.post(self.hpc_program_names_url, data=request_data, verify=False)
+        request_data = {'token': self._hg_token, 'hpc': hpc}
+        response = self._requests.post(self._hg_hpc_program_names_url, data=request_data, verify=False)
 
         if response.status_code != requests.codes.ok:
-            raise Exception("Error: HydroGate connection error.")
+            raise Exception("HydroGate connection error.")
 
         response_dict = json.loads(response.content)
 
         if response_dict['status'] == 'success':
             return response_dict['programnames']
         else:
-            raise Exception('Error %s' % response_dict['description'])
+            raise Exception('Hydrogate error: %s' % response_dict['description'])
 
     def get_program_info(self, program_name):
         # returns information about specific program/application
         self._check_user_hpc_authentication()
-        if not self.token:
-            self.get_token()
+        if not self._hg_token:
+            self._get_token()
         else:
-            if self.get_token_expire_time() == 0:
-                self.get_token()
+            if self._get_token_expire_time() == 0:
+                self._get_token()
 
-        request_data = {'token': self.token, 'program': program_name}
-        response = self.requests.get(self.program_info_url, params=request_data, verify=False)
+        request_data = {'token': self._hg_token, 'program': program_name}
+        response = self._requests.get(self._hg_program_info_url, params=request_data, verify=False)
 
         if response.status_code != requests.codes.ok:
-            raise Exception("Error: HydroGate connection error.")
+            raise Exception("Hydrogate connection error.")
 
         response_dict = json.loads(response.content)
         if response_dict['status'] == 'success':
             return response_dict
         else:
-            raise Exception('Error %s' % response_dict['description'])
+            raise Exception('Hydrogate error %s' % response_dict['description'])
 
-    def get_token(self):
-        if self.token:
-            return self.token
+    def _get_token(self):
+        if self._hg_token:
+            return self._hg_token
 
-        #self._check_user_hpc_authentication()
-
-        user_data = {'username': self.hpc_username, 'password': self.hpc_password}
-        response = self.requests.post(self.token_url, data=user_data, verify=False)
+        user_data = {'username': self._hg_username, 'password': self._hg_password}
+        response = self._requests.post(self._hg_token_url, data=user_data, verify=False)
         if response.status_code != requests.codes.ok:
             raise Exception("HydroGate connection error.")
 
         response_dict = json.loads(response.content)
         if response_dict['status'] == 'success':
-            self.token = response_dict['token']
-            return self.token
+            self._hg_token = response_dict['token']
+            return self._hg_token
         else:
-            raise Exception('Error:%s' % response_dict['description'])
+            raise Exception('Hydrogate error:%s' % response_dict['description'])
 
-    def get_token_expire_time(self):
+    def _get_token_expire_time(self):
         # returns token expire time in seconds (0 means token has expired)
         self._check_user_hpc_authentication()
-        if not self.token:
+        if not self._hg_token:
             return 0
 
-        request_data = {'token': self.token}
-        response = self.requests.get(self.token_expire_time_url, params=request_data, verify=False)
+        request_data = {'token': self._hg_token}
+        response = self._requests.get(self._hg_token_expire_time_url, params=request_data, verify=False)
 
         if response.status_code != requests.codes.ok:
-            raise Exception("Error: HydroGate connection error.")
+            raise Exception("Hydrogate connection error.")
 
         response_dict = json.loads(response.content)
         if response_dict['status'] == 'success':
             return response_dict['remainingexpiretime']
         else:
-            raise Exception('Error %s' % response_dict['description'])
+            raise Exception('Hydrogate error: %s' % response_dict['description'])
 
     def show_service_request_history(self, order='first', count=None):
         _ServiceLog.print_log(order=order, count=count)
@@ -258,18 +266,18 @@ class HydroDS(object):
     def upload_package(self, package_file_url_path):
         self._check_user_hpc_authentication()
 
-        if not self.token:
-            self.get_token()
+        if not self._hg_token:
+            self._get_token()
         else:
-            if self.get_token_expire_time() == 0:
-                self.get_token()
+            if self._get_token_expire_time() == 0:
+                self._get_token()
 
         # location of the file to be uploaded (must be a url file path).
-        request_data = {'token': self.token, 'package': package_file_url_path, 'hpc': self.default_hpc}
-        response = self.requests.post(self.upload_pkg_url, data=request_data, verify=False)
+        request_data = {'token': self._hg_token, 'package': package_file_url_path, 'hpc': self._default_hpc}
+        response = self._requests.post(self._hg_upload_pkg_url, data=request_data, verify=False)
 
         if response.status_code != requests.codes.ok:
-            raise Exception("Error: HydroGate connection error.")
+            raise Exception("Hydrogate connection error.")
 
         response_dict = json.loads(response.content)
 
@@ -281,7 +289,7 @@ class HydroDS(object):
             self.save_service_call_history()
             return service_req
         else:
-            raise Exception('Error in uploading the package:%s' % response_dict['description'])
+            raise Exception('Hydrogate error: package uploading failed:%s' % response_dict['description'])
 
     def get_upload_status(self, package_id=None):
         if not package_id:
@@ -292,16 +300,16 @@ class HydroDS(object):
             else:
                 package_id = last_request.service_id_value
 
-        if not self.token:
-            self.get_token()
+        if not self._hg_token:
+            self._get_token()
         else:
-            if self.get_token_expire_time() == 0:
-                self.get_token()
+            if self._get_token_expire_time() == 0:
+                self._get_token()
 
-        request_data = {'token': self.token, 'packageid': int(package_id)}
-        response = self.requests.get(self.upload_pkg_status_url, params=request_data, verify=False)
+        request_data = {'token': self._hg_token, 'packageid': int(package_id)}
+        response = self._requests.get(self._hg_upload_pkg_status_url, params=request_data, verify=False)
         if response.status_code != requests.codes.ok:
-            raise Exception("HydroGate error." + response.reason + " " + response.content)
+            raise Exception("Hydrogate error." + response.reason + " " + response.content)
 
         response_dict = json.loads(response.content)
         if response_dict['status'] == 'success':
@@ -312,14 +320,14 @@ class HydroDS(object):
             self.save_service_call_history()
             return service_req
         else:
-            raise Exception('HydroGate error:' + response_dict['description'])
+            raise Exception('Hydrogate error:' + response_dict['description'])
 
     def submit_job(self, package_id, program_name, input_raster_file_name=None, **kwargs):
        # TODO: check that the user provided program_name is one of the supported programs using the get_available_programs()
         self._check_user_hpc_authentication()
 
-        if self.get_token_expire_time() == 0:
-            self.get_token()
+        if self._get_token_expire_time() == 0:
+            self._get_token()
 
         job_def = {}
         if len(kwargs) > 0:
@@ -342,10 +350,10 @@ class HydroDS(object):
             else:
                 raise Exception("Program parameters are missing for '%s'." % program_name)
 
-        request_data = {'token': self.token, 'packageid': int(package_id), 'jobdefinition': json.dumps(job_def)}
-        response = self.requests.post(self.submit_job_url, data=request_data, verify=False)
+        request_data = {'token': self._hg_token, 'packageid': int(package_id), 'jobdefinition': json.dumps(job_def)}
+        response = self._requests.post(self._hg_submit_job_url, data=request_data, verify=False)
         if response.status_code != requests.codes.ok:
-            raise Exception("Error: HydroGate connection error.")
+            raise Exception("Hydrogate connection error.")
 
         response_dict = json.loads(response.content)
         if response_dict['status'] == 'success':
@@ -357,18 +365,18 @@ class HydroDS(object):
             self.save_service_call_history()
             return service_req
         else:
-            raise Exception('HydroGate error:%s' % response_dict['description'])
+            raise Exception('Hydrogate error:%s' % response_dict['description'])
 
     def get_job_status(self, job_id):
         self._check_user_hpc_authentication()
 
-        if self.get_token_expire_time() == 0:
-            self.get_token()
+        if self._get_token_expire_time() == 0:
+            self._get_token()
 
-        request_data = {'token': self.token, 'jobid': job_id}
-        response = self.requests.get(self.job_status_url, params=request_data, verify=False)
+        request_data = {'token': self._hg_token, 'jobid': job_id}
+        response = self._requests.get(self._hg_job_status_url, params=request_data, verify=False)
         if response.status_code != requests.codes.ok:
-            raise Exception("HydroGate error." + response.reason + " " + response.content)
+            raise Exception("Hydrogate error." + response.reason + " " + response.content)
 
         response_dict = json.loads(response.content)
         if response_dict['status'] == 'success':
@@ -379,7 +387,7 @@ class HydroDS(object):
             self.save_service_call_history()
             return job_status
         else:
-            raise Exception('HydroGate error:%s' % response_dict['description'])
+            raise Exception('Hydrogate error:%s' % response_dict['description'])
 
     def list_my_files(self):
         """
@@ -433,7 +441,7 @@ class HydroDS(object):
         """
         Gets a list of supported data resources on the HydroDS api server
 
-        :return: a list of supported data files that includes metadata for each file
+        :return: a list of supported data files including metadata for each file
 
         example of return data:
         [
@@ -485,8 +493,8 @@ class HydroDS(object):
         :type bottom: float
         :param input_raster: raster file to subset from (this can either be a url path for the user file on the HydroDS
                              server or name of a relevant supported data file on the HydroDS server)
-        :param output_raster: name for the output (subsetted) raster file (if there is file already with the same name it will be
-                              overwritten)
+        :param output_raster: name for the output (subsetted) raster file (if there is file already with the same name
+                              it will be overwritten)
         :type output_raster: string
         :param save_as: (optional) file name and file path to save the subsetted raster file locally
         :type save_as: string
@@ -525,6 +533,7 @@ class HydroDS(object):
         response = self._make_data_service_request(url=url, params=payload)
         return self._process_dataservice_response(response, save_as)
 
+    # TODO: this one not working as the HydroDS service api is not working
     def subset_usgs_ned_dem(self, left, top, right, bottom, output_raster, save_as=None):
         """
         Subsets usgs ned dem and creates a new tif file with the subset data
@@ -537,12 +546,7 @@ class HydroDS(object):
         :param save_as: (optional) subset dem tif file to save as (file name with path)
         :return: a dictionary with key 'output_raster' and value of url path for the combined raster file
 
-        example call format: http://129.123.41.184:20199/api/dataservice/rastersubset?xmin=-111.97&ymax=42.11&xmax=-111.35&ymin=41.66&input_raster=nedWesternUS.tif&output_raster=logan.tif
         """
-
-        #url = 'http://129.123.41.158:8080/subsetdem'
-        #self._check_user_irods_authentication()
-
         url = self._get_dataservice_specific_url(service_name='subsetUSGSNEDDEM')
         if save_as:
             self._validate_file_save_as(save_as)
@@ -552,7 +556,6 @@ class HydroDS(object):
             raise HydroDSArgumentException("{file_name} is not a valid raster file name".format(file_name=output_raster))
 
         payload = {'xmin': left, 'ymin': bottom, 'xmax': right, 'ymax': top, 'output_raster': output_raster}
-
         response = self._make_data_service_request(url=url, params=payload)
         return self._process_dataservice_response(response, save_as)
 
@@ -615,9 +618,11 @@ class HydroDS(object):
         :param output_netcdf: name for the generated netcdf file (if there is file already with the same name it will be
                               overwritten)
         :type output_netcdf: string
-        :param increasing_x: if data in netcdf format to be ordered in the direction of increasing X-coordinate
+        :param increasing_x: (optional) if data in netcdf format to be ordered in the direction of increasing
+                             X-coordinate (default is False)
         :type increasing_x: bool
-        :param increasing_y: if data in netcdf format to be ordered in the direction of increasing Y-coordinate
+        :param increasing_y: (optional) if data in netcdf format to be ordered in the direction of increasing
+                             Y-coordinate (default is False)
         :type increasing_y: bool
         :param output_varname: name for the output NetCDF data variable
         :type output_varname: string
@@ -634,7 +639,8 @@ class HydroDS(object):
         Example usage:
             hds = HydroDS(username=your_username, password=your_password)
             response_data = hds.raster_to_netcdf_and_rename_variable(input_raster_url_path=provide_input_raster_url_path_here,
-                                                 increasing_y=True, output_netcdf='raster_to_netcdf_slope_logan.nc')
+                                                 increasing_x=False, increasing_y=True,
+                                                 output_netcdf='raster_to_netcdf_slope_logan.nc')
 
             output_netcdf_url = response_data['output_netcdf']
 
@@ -713,8 +719,8 @@ class HydroDS(object):
         :param input_raster_url_path: url file path of the raster file (user owned) on HydroDS api server for which
                                       slope data is needed
         :type input_raster_url_path: string
-        :param output_raster: name of the output slope raster file (if there is file already with the same name it will be
-                              overwritten)
+        :param output_raster: name of the output slope raster file (if there is file already with the same name it
+                              will be overwritten)
         :type output_raster: string
         :param save_as: (optional) raster file name and file path to save the generated slope raster file locally
         :type save_as: string
@@ -745,8 +751,8 @@ class HydroDS(object):
         :param input_raster_url_path: url file path of the raster file (user owned) on HydroDS api server for which
                                       aspect data is needed
         :type input_raster_url_path: string
-        :param output_raster: name of the output aspect raster file (if there is file already with the same name it will be
-                              overwritten)
+        :param output_raster: name of the output aspect raster file (if there is file already with the same name it
+                              will be overwritten)
         :type output_raster: string
         :param save_as: (optional) raster file name and file path to save the generated aspect raster file locally
         :type save_as: string
@@ -811,10 +817,9 @@ class HydroDS(object):
 
         Example usage:
             hds = HydroDS(username=your_username, password=your_password)
-            ref_input_raster_url = 'http://hydro-ds-uwrl.usu.edu:20199/files/data/user_2/SpawnProj.tif'
             input_raster = 'nlcd2011CONUS.tif'  # this a supported data resource file on the HydroDS api server
             hds_response_data =  hds.project_clip_raster(input_raster=input_raster,
-                                                         ref_raster_url_path=ref_input_raster_url,
+                                                         ref_raster_url_path=provide_ref_input_raster_url_path_here,
                                                          output_raster='nlcd_proj_spwan.tif')
 
             # print url path of the projected/clipped raster file
@@ -832,21 +837,6 @@ class HydroDS(object):
 
         response = self._make_data_service_request(url=url, params=payload)
         return self._process_dataservice_response(response, save_as)
-
-    # TODO: I think the following function is obsolete - use the function above (project_clip_raster)
-    def subset_NLCD_to_reference_raster(self, input_raster_url_path, save_as=None):
-        if save_as:
-            if not self._validate_file_save_as(save_as):
-                return
-
-        input_raster_name = self._get_file_name_from_url_file_path(input_raster_url_path)
-
-        # Example: http://129.123.41.158:8080/projectandclipraster?raster=nedLogan.tif
-
-        url = self.dataservice_base_url + '/projectandclipraster'
-        payload = {"raster": input_raster_name}
-        response = self.requests.get(url, params=payload)
-        return self._process_service_response(response, "subset_NLCD_to_reference_raster", save_as)
 
     def get_canopy_variable(self, input_NLCD_raster_url_path, variable_name, output_netcdf, save_as=None):
         """
@@ -870,8 +860,7 @@ class HydroDS(object):
 
         Example usage:
             hds = HydroDS(username=your_username, password=your_password)
-            input_NLCD_raster_url_path = 'http://hydro-ds.uwrl.usu.edu:20199/files/data/user_2/nlcd_proj_spwan.tif'
-            hds_response_data = hds.get_canopy_variable(input_NLCD_raster_url_path=input_NLCD_raster_url_path,
+            hds_response_data = hds.get_canopy_variable(input_NLCD_raster_url_path=provide_input_NLCD_raster_url_path_here,
                                                         variable_name='cc', output_netcdf='nlcd_cc_spwan.nc',
                                                         save_as=r'C:\hydro-DS_test\nlcd_cc_spwan.nc')
 
@@ -930,8 +919,8 @@ class HydroDS(object):
         :type input_one_raster_url_path: string
         :param input_two_raster_url_path: url file path for the 2nd raster file (user owned) on HydroDS api server
         :type input_two_raster_url_path: string
-        :param output_raster: name of the output (combined) raster file (if there is file already with the same name it will be
-                              overwritten)
+        :param output_raster: name of the output (combined) raster file (if there is file already with the same name it
+                              will be overwritten)
         :type output_raster: string
         :param save_as: (optional) raster file name and file path to save the generated combined raster file locally
         :type save_as: string
@@ -945,8 +934,8 @@ class HydroDS(object):
 
         Example usage:
             hds = HydroDS(username=your_username, password=your_password)
-            hds_response_data = hds.combine_rasters(input_one_raster_url_path=raster_one_url,
-                                                    input_two_raster_url_path=raster_two_url,
+            hds_response_data = hds.combine_rasters(input_one_raster_url_path=provide_raster_one_url_here,
+                                                    input_two_raster_url_path=provide_raster_two_url_here,
                                                     output_raster='combined_rasters.tif',
                                                     save_as=r'C:\hydro-ds\combined_raster.tif')
 
@@ -968,6 +957,7 @@ class HydroDS(object):
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
 
+    # TODO: Not working - no HydroDS web service
     def get_daymet_mosaic(self, start_year, end_year, save_as=None):
         if save_as:
             if not self._validate_file_save_as(save_as):
@@ -984,18 +974,17 @@ class HydroDS(object):
         except:
             raise Exception("Error:Invalid end year. Year must be an integer value.")
 
-        # Example: http://129.123.41.158:8080/downloaddaymetmosaic?startyear=2011&endyear=2012
-
-        url = self.dataservice_base_url + '/downloaddaymetmosaic'
+        url = self._dataservice_base_url + '/downloaddaymetmosaic'
 
         if end_year > start_year:
             payload = {"startyear": start_year, "endyear": end_year}
         else:
             payload = {"startyear": end_year, "endyear": start_year}
 
-        response = self.requests.get(url, params=payload)
+        response = self._requests.get(url, params=payload)
         return self._process_service_response(response, "get_daymet_mosaic", save_as)
 
+    # TODO: Not working - no HydrDS web service
     def get_daymet_tile(self, start_year, end_year, start_tile, end_tile, save_as=None):
         if save_as:
             # TODO: should we check that the file extension must be  .tif type for saving
@@ -1023,9 +1012,7 @@ class HydroDS(object):
         except:
             raise Exception("Error:Invalid end tile number. Tile number must be an integer value.")
 
-        # Example: http://129.123.41.158:8080/downloaddaymettile?startyear=2011&endyear=2012&starttile=11715&endtile=11716
-
-        url = self.dataservice_base_url + '/downloaddaymettile'
+        url = self._dataservice_base_url + '/downloaddaymettile'
 
         if end_year > start_year:
             payload = {"startyear": start_year, "endyear": end_year}
@@ -1034,7 +1021,7 @@ class HydroDS(object):
 
         payload["starttile"] = start_tile
         payload["endtile"] = end_tile
-        response = self.requests.get(url, params=payload)
+        response = self._requests.get(url, params=payload)
         return self._process_service_response(response, "get_daymet_tile", save_as)
 
     def reverse_netcdf_yaxis(self, input_netcdf_url_path, output_netcdf, save_as=None):
@@ -1058,7 +1045,7 @@ class HydroDS(object):
 
         Example usage:
             hds = HydroDS(username=your_username, password=your_password)
-            response_data = hds.reverse_netcdf_yaxis(input_netcdf_url_path=provide_input_netcdf_url,
+            response_data = hds.reverse_netcdf_yaxis(input_netcdf_url_path=provide_input_netcdf_url_here,
                                                      output_netcdf='resample_reverse_yaxis.nc')
 
             output_reverse_netcdf_url = response_data['output_netcdf']
@@ -1105,7 +1092,7 @@ class HydroDS(object):
 
         Example usage:
             hds = HydroDS(username=your_username, password=your_password)
-            response_data = hds.reverse_netcdf_yaxis_rename_variable(input_netcdf_url_path=provide_input_netcdf_url,
+            response_data = hds.reverse_netcdf_yaxis_rename_variable(input_netcdf_url_path=provide_input_netcdf_url_here,
                                                              input_variable_name='Band1', output_variable_name='Band1',
                                                              output_netcdf='resample_reverse_yaxis_rename_variable.nc')
 
@@ -1160,7 +1147,7 @@ class HydroDS(object):
 
         Example usage:
             hds = HydroDS(username=your_username, password=your_password)
-            response_data = hds.netcdf_rename_variable(input_netcdf_url_path=provide_input_netcdf_url,
+            response_data = hds.netcdf_rename_variable(input_netcdf_url_path=provide_input_netcdf_url_here,
                                                        input_variable_name='Band1', output_variable_name='Band1',
                                                        output_netcdf='rename_variable.nc')
 
@@ -1188,33 +1175,6 @@ class HydroDS(object):
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
 
-    # TODO: this method has been replaced by the concatenate_netcdf method - need to delete this one
-    def combine_netcdf(self, input_one_netcdf_url_path, input_two_netcdf_url_path, save_as=None):
-        """
-        Joins/combines two netcdf files to one netcdf file
-        :param input_one_netcdf_url_path: url file path for the 1st netcdf file on HydroDS api server
-        :param input_two_netcdf_url_path: url file path for the 2nd netcdf file on HydroDS api server
-        :param save_as: (optional) file name and path to save the joined netcdf file locally
-        :return: returns a dictionary with key 'output_netcdf' and value of url path for the joined netcdf file
-
-        :raises:
-            HydroDSArgumentException: one or more arguments failed validation
-
-        """
-        if save_as:
-            self._validate_file_save_as(save_as)
-
-        input_one_netcdf_name = self._get_file_name_from_url_file_path(input_one_netcdf_url_path)
-        input_two_netcdf_name = self._get_file_name_from_url_file_path(input_two_netcdf_url_path)
-
-        # Example: http://129.123.41.158:8080/combinenetcdf?inputnc1=netcdf24685a2f0387402dabf46bf7b56abdcb.nc&
-        # inputnc2=netcdffd9a5b6f7d634d1cbd5325b98899b073.nc
-
-        url = self.dataservice_base_url + '/combinenetcdf'
-        payload = {"inputnc1": input_one_netcdf_name, "inputnc2": input_two_netcdf_name}
-        response = self.requests.get(url, params=payload)
-        return self._process_service_response(response, "combine_netcdf", save_as)
-
     def subset_netcdf(self, input_netcdf, ref_raster_url_path, output_netcdf, save_as=None):
         """
         Subset netcdf data based on a reference raster
@@ -1239,7 +1199,7 @@ class HydroDS(object):
 
         Example usage:
             hds = HydroDS(username=your_username, password=your_password)
-            response_data = hds.subset_netcdf(input_netcdf=provide_input_netcdf_static_file_or_url_file_path,
+            response_data = hds.subset_netcdf(input_netcdf=provide_input_netcdf_static_file_name_or_url_file_path_here,
                                               ref_raster_url_path=ref_input_raster_url,
                                               output_netcdf='subset_netcdf_to_spawn.nc')
 
@@ -1290,7 +1250,7 @@ class HydroDS(object):
 
         Example usage:
             hds = HydroDS(username=your_username, password=your_password)
-            response_data = hds.subset_netcdf_by_time(input_netcdf_url_path=your_input_netcdf_url_path_here,
+            response_data = hds.subset_netcdf_by_time(input_netcdf_url_path=provide_input_netcdf_url_path_here,
                                                       time_dimension_name='time', start_date='01/01/2010',
                                                       end_date='01/11/2010',
                                                       output_netcdf='subset_prcp_spwan_1_to_10_days.nc')
@@ -1357,9 +1317,9 @@ class HydroDS(object):
 
         Example usage:
             hds = HydroDS(username=your_username, password=your_password)
-            input_netcdf_url_path = 'http://hydro-ds.uwrl.usu.edu:20199/files/data/user_2/subset_netcdf_to_spawn.nc'
-            hds_response_data = hds.project_netcdf(input_netcdf_url_path=input_netcdf_url_path, variable_name='prcp',
-                                                   utm_zone=12, output_netcdf='projected_prcp_spwan.nc')
+            hds_response_data = hds.project_netcdf(input_netcdf_url_path=provide_input_netcdf_url_path_here,
+                                                   variable_name='prcp', utm_zone=12,
+                                                   output_netcdf='projected_prcp_spwan.nc')
 
             # print the url path for the projected netcdf file
             output_projected_netcdf_url = hds_response_data['output_netcdf']
@@ -1444,8 +1404,8 @@ class HydroDS(object):
         :type input_netcdf1_url_path: string
         :param input_netcdf2_url_path: url file path for the 2nd netcdf file (user owned) on HydroDS api server
         :type input_netcdf2_url_path: string
-        :param output_netcdf: name of the output (concatenated) netcdf file (if there is file already with the same name it will be
-                              overwritten)
+        :param output_netcdf: name of the output (concatenated) netcdf file (if there is file already with the same name
+                              it will be overwritten)
         :type output_netcdf: string
         :param save_as: (optional) file name and file path to save the generated concatenated netcdf file locally
         :type save_as: string
@@ -1506,7 +1466,7 @@ class HydroDS(object):
 
         Example usage:
             hds = HydroDS(username=your_username, password=your_password)
-            hds_response_data = hds.project_raster_to_UTM_NAD83(input_raster_url_path='url_raster_file_path',
+            hds_response_data = hds.project_raster_to_UTM_NAD83(input_raster_url_path=provide_raster_file_url_path_here,
                                                                 utm_zone=12, output_raster='projected_raster.tif')
 
             # print url path of the projected raster file
@@ -1561,8 +1521,8 @@ class HydroDS(object):
             hds = HydroDS(username=your_username, password=your_password)
 
             # projection using UTM zone
-            response_data = hds.project_shapefile(input_shapefile_url_path=your_input_shapefile_url, utm_zone=12,
-                                                  output_shape_file='outlet-proj_utm.shp')
+            response_data = hds.project_shapefile(input_shapefile_url_path=provide_input_shapefile_url_path_here,
+                                                  utm_zone=12, output_shape_file='outlet-proj_utm.shp')
             output_proj_utm_shapefile_url = response_data['output_shape_file']
 
             # print the url path for the generated shapefile
@@ -1690,8 +1650,8 @@ class HydroDS(object):
 
         Example usage:
             hds = HydroDS(username=your_username, password=your_password)
-            # using outlet point location
-            hds_response_data = hds.delineate_watershed(input_raster_url_path=raster_url,
+            # >>> using outlet point location
+            hds_response_data = hds.delineate_watershed(input_raster_url_path=provide_input_raster_url_path_here,
                                                         outlet_point_x=111.787,
                                                         outlet_point_y=41.742,
                                                         threshold=60000,
@@ -1708,13 +1668,14 @@ class HydroDS(object):
             output_outlet_shapefile_url = hds_response_data['output_outlet_shapefile']
             print(output_outlet_shapefile_url)
 
-            # using outlet shape file
+            # >>> using outlet shape file
             hds_response_data = hds.delineate_watershed(input_raster_url_path=raster_url,
-                                                        input_outlet_shapefile_url_path=outlet_shapefile_url,
+                                                        input_outlet_shapefile_url_path=provide_outlet_shapefile_url_path_here,
                                                         threshold=60000,
                                                         output_raster='logan_watershed.tif',
                                                         output_outlet_shapefile='logan_outlet.shp',
                                                         save_as=r'C:\hydro-ds\delineated_ws.tif')
+
             # print url path of the delineated watershed raster file
             output_delineated_raster_url = hds_response_data['output_raster']
             print(output_delineated_raster_url)
@@ -1806,8 +1767,9 @@ class HydroDS(object):
 
         Example usage:
             hds = HydroDS(username=your_username, password=your_password)
-            response_data = hds.resample_raster(input_raster_url_path=provide_input_raster_url, cell_size_dx=50,
-                                                cell_size_dy=50, resample='near', output_raster='resample_spawn.tif')
+            response_data = hds.resample_raster(input_raster_url_path=provide_input_raster_url_path_here,
+                                                cell_size_dx=50, cell_size_dy=50, resample='near',
+                                                output_raster='resample_spawn.tif')
 
             output_resample_raster_url = response_data['output_raster']
 
@@ -1872,8 +1834,8 @@ class HydroDS(object):
             hds = HydroDS(username=your_username, password=your_password)
 
             # using UTM based projection
-            response_data = hds.project_resample_raster(input_raster_url_path='input_raster_url_path', cell_size_dx=100,
-                                                        cell_size_dy=100, utm_zone=12,
+            response_data = hds.project_resample_raster(input_raster_url_path=provide_input_raster_url_path_here,
+                                                        cell_size_dx=100, cell_size_dy=100, utm_zone=12,
                                                         output_raster='project_resample_utm.tif', resample='bilinear')
             output_proj_resample_utm_raster_url = response_data['output_raster']
 
@@ -1884,8 +1846,8 @@ class HydroDS(object):
             response_data = hds.project_resample_raster(input_raster_url_path='input_raster_url_path', cell_size_dx=100,
                                                         cell_size_dy=100, epsg_code=2152,
                                                         output_raster='project_resample_epsg.tif', resample='bilinear')
-            output_proj_resample_epsg_raster_url = response_data['output_raster']
 
+            output_proj_resample_epsg_raster_url = response_data['output_raster']
             # print the url path for the generated raster file
             print(output_proj_resample_epsg_raster_url)
 
@@ -1973,7 +1935,7 @@ class HydroDS(object):
             hds = HydroDS(username=your_username, password=your_password)
             input_raster = "nedWesternUS.tif"   #DEM of western USA (HydroDS supported data)
 
-            # using UTM based projection
+            # >>> using UTM based projection
             response_data = hds.subset_project_resample_raster(input_raster=input_raster, left=-111.97, top=42.11,
                                                                right=-111.35, bottom=41.66, cell_size_dx=100,
                                                                cell_size_dy=100, resample='bilinear',
@@ -1984,8 +1946,8 @@ class HydroDS(object):
             # print the url path for the generated raster file
             print(output_subset_proj_resample_utm_raster_url)
 
-            # using EPSG based projection
-            response_data = hds.subset_project_resample_raster(input_raster=input_raster,left=-111.97, top=42.11,
+            # >>> using EPSG based projection
+            response_data = hds.subset_project_resample_raster(input_raster=input_raster, left=-111.97, top=42.11,
                                                                right=-111.35, bottom=41.66, cell_size_dx=100,
                                                                cell_size_dy=100, resample='bilinear', epsg_code=2152,
                                                                output_raster='subset_project_resample_logan_epsg.tif')
@@ -2056,7 +2018,7 @@ class HydroDS(object):
 
         Example usage:
             hds = HydroDS(username=your_username, password=your_password)
-            response_data = hds.resample_netcdf(input_netcdf_url_path=provide_input_netcdf_url_path,
+            response_data = hds.resample_netcdf(input_netcdf_url_path=provide_input_netcdf_url_path_here,
                                         ref_netcdf_url_path=provide_ref_netcdf_url_path, variable_name='prcp',
                                         output_netcdf='resample_to_ref_prcp_spwan.nc')
 
@@ -2097,6 +2059,7 @@ class HydroDS(object):
         :param multiplier_factor: (optional) factor by which the units to be converted (default is 1)
         :type multiplier_factor: float
         :param offset: (optional) additive factor (default is 0)
+        :type offset: float
         :param save_as: (optional) file name and file path to save the generated netcdf file locally
         :return: a dictionary with key 'output_netcdf' and value of url path for the output netcdf file
 
@@ -2110,7 +2073,7 @@ class HydroDS(object):
             hds = HydroDS(username=your_username, password=your_password)
             input_netcdf_url_path = 'http://hydro-ds.uwrl.usu.edu:20199/files/data/user_2/subset_netcdf_to_spawn.nc'
 
-            response_data = hds.convert_netcdf_units(input_netcdf_url_path=input_netcdf_url_path,
+            response_data = hds.convert_netcdf_units(input_netcdf_url_path=provide_input_netcdf_url_path_here,
                                                      output_netcdf='converted_units_spwan.nc',
                                                      variable_name='prcp', variable_new_units="m/hr",
                                                      multiplier_factor=0.00004167, offset=0)
@@ -2137,14 +2100,14 @@ class HydroDS(object):
 
     def upload_file_irods(self, file_to_upload):
         if not os.path.isfile(file_to_upload):
-            raise Exception("Upload file error: Specified file to upload (%s) does not exist." % file_to_upload)
+            raise Exception("iRODS upload file error: Specified file to upload (%s) does not exist." % file_to_upload)
 
         file_name = os.path.basename(file_to_upload)
-        file_url_path = self.irods_rest_base_url + '/fileContents/usu/home/rods/' + file_name
+        file_url_path = self._irods_rest_base_url + '/fileContents/usu/home/rods/' + file_name
         headers = {'accept': 'application/json'}
         with open(file_to_upload, 'rb') as upload_file_obj:
-            response = self.requests.post(file_url_path, data={'uploadFile': file_name},
-                                          files={'file': upload_file_obj}, auth=(self.username, self.password),
+            response = self._requests.post(file_url_path, data={'uploadFile': file_name},
+                                          files={'file': upload_file_obj}, auth=(self._irods_username, self._irods_password),
                                           headers=headers)
 
         if response.status_code != requests.codes.ok:
@@ -2195,7 +2158,7 @@ class HydroDS(object):
         """
         Download a file from the HydroDS api server
 
-        :param file_url_path: url for the file to be downloaded
+        :param file_url_path: HydroDS url for the file to be downloaded
         :type file_url_path: string
         :param save_as: file name and file path to save the downloaded file
         :type save_as: string
@@ -2208,8 +2171,7 @@ class HydroDS(object):
 
         Example usage:
             hds = HydroDS(username=your_username, password=your_password)
-            url_path_for_the_file_to_download = 'http://hydro-ds.uwrl.usu.edu:20199/files/data/user_2/nlcd_proj_spwan.tif'
-            hds.download_file(file_url_path=url_path_for_the_file_to_download, save_as=r'C:\hydro-ds\nlcd_proj_spwan.tif')
+            hds.download_file(file_url_path=provide_download_file_url_path_here, save_as=r'C:\hydro-ds\nlcd_proj_spwan.tif')
 
             print("File download was successful")
 
@@ -2217,7 +2179,7 @@ class HydroDS(object):
         self._validate_file_save_as(save_as)
 
         with open(save_as, 'wb') as file_obj:
-            response = requests.get(file_url_path, stream=True, auth=self.authorization)
+            response = requests.get(file_url_path, stream=True, auth=self._hg_auth)
 
             if not response.ok:
                 # raise appropriate HydroDS exception
@@ -2271,13 +2233,13 @@ class HydroDS(object):
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as)
 
-    def hydrogate_download_file(self, file_url_path, save_as):
+    def hydrogate_download_file_from_irods(self, file_url_path, save_as):
         self._check_user_irods_authentication()
         if not self._validate_file_save_as(save_as):
             return
-        file_url_path = self.irods_rest_base_url + '/fileContents' + file_url_path
+        file_url_path = self._irods_rest_base_url + '/fileContents' + file_url_path
         with open(save_as, 'wb') as file_obj:
-            response = requests.get(file_url_path, stream=True, auth=(self.irods_username, self.irods_password))
+            response = requests.get(file_url_path, stream=True, auth=(self._irods_username, self._irods_password))
 
             if not response.ok:
                 # Something went wrong
@@ -2294,8 +2256,25 @@ class HydroDS(object):
         self.save_service_call_history()
         return service_req
 
+    def download_file_from_hydrogate(self, hg_file_url_path, save_as):
+        # no authentication needed for downloading the file
+        self._validate_file_save_as(save_as)
+
+        download_file_name = hg_file_url_path.split('/')[-1]
+        hg_download_file_url_path = 'http://129.123.41.158:20198/{file_name}'.format(file_name=download_file_name)
+        with open(save_as, 'wb') as file_obj:
+            response = requests.get(hg_download_file_url_path, stream=True)
+            if not response.ok:
+                # Something went wrong
+                raise Exception("HydroGate error: Error in downloading the file." + response.reason + " " + response.content)
+
+            for block in response.iter_content(1024):
+                if not block:
+                    break
+                file_obj.write(block)
+
     def set_hydroshare_account(self, username, password):
-        self.hydroshare_auth = (username, password)
+        self._hydroshare_auth = (username, password)
 
     def create_hydroshare_resource(self, file_name, resource_type, title=None, abstract=None, keywords=None):
         """
@@ -2341,13 +2320,13 @@ class HydroDS(object):
             print(response_data['resource_type'])
         """
 
-        if not self.hydroshare_auth:
+        if not self._hydroshare_auth:
             raise HydroDSNotAuthenticatedException("You don't have access to HydroShare. Set your HydroShare login account "
                                                    "using the function 'set_hydroshare_account()'")
 
         url = self._get_dataservice_specific_url('hydroshare/createresource')
-        payload = {'file_name': file_name, 'resource_type': resource_type, 'hs_username': self.hydroshare_auth[0],
-                   'hs_password': self.hydroshare_auth[1]}
+        payload = {'file_name': file_name, 'resource_type': resource_type, 'hs_username': self._hydroshare_auth[0],
+                   'hs_password': self._hydroshare_auth[1]}
         if title:
             payload['title'] = title
         if abstract:
@@ -2363,7 +2342,7 @@ class HydroDS(object):
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as=None)
 
-    ## TOPNET
+    ## TOPNET example service
     def download_streamflow(self, usgs_gage, start_year, end_year, output_streamflow=None, save_as=None):
         """
         :param input_netcdf_url_path: url file path to netcdf file on the api server which needs to be resampled
@@ -2405,16 +2384,16 @@ class HydroDS(object):
 
     def _make_data_service_request(self, url, http_method='GET', params=None, data=None, files=None):
         if http_method == 'GET':
-            return self.requests.get(url, params=params, data=data, auth=self.authorization)
+            return self._requests.get(url, params=params, data=data, auth=self._hg_auth)
         elif http_method == 'DELETE':
-            return self.requests.delete(url, params=params, data=data, auth=self.authorization)
+            return self._requests.delete(url, params=params, data=data, auth=self._hg_auth)
         elif http_method == 'POST':
-            return self.requests.post(url, params=params, data=data, files=files, auth=self.authorization)
+            return self._requests.post(url, params=params, data=data, files=files, auth=self._hg_auth)
         else:
             raise Exception("%s http method is not supported for the HydroDS API." % http_method)
 
     def _get_dataservice_specific_url(self, service_name):
-        return "{base_url}/{service_name}".format(base_url=self.dataservice_base_url, service_name=service_name)
+        return "{base_url}/{service_name}".format(base_url=self._dataservice_base_url, service_name=service_name)
 
     def _process_dataservice_response(self, response, save_as=None):
         if response.status_code != requests.codes.ok:
@@ -2517,11 +2496,11 @@ class HydroDS(object):
                                                "be:{file_ext}".format(file_extension=file_extension, file_ext=file_ext))
 
     def _check_user_irods_authentication(self):
-        if not self.user_irods_authenticated:
+        if not self._user_irods_authenticated:
             raise Exception("You first need to get authenticated to iRODS.")
 
     def _check_user_hpc_authentication(self):
-        if not self.user_hpc_authenticated:
+        if not self._user_hg_authenticated:
             raise Exception("You first need to get authenticated to HPC.")
 
     def _get_file_name_from_url_file_path(self, url_file_path):
