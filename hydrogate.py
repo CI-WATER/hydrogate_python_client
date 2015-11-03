@@ -8,6 +8,7 @@ import os
 import json
 import pickle
 import datetime
+import time
 
 class HydroDSException(Exception):
     pass
@@ -53,7 +54,7 @@ class HydroDS(object):
         """
 
         self._hydrogate_base_url = 'https://129.123.41.158/hydrogate'
-        self._dataservice_base_url = 'http://hydro-ds.uwrl.usu.edu:20199/api/dataservice'
+        self._dataservice_base_url = self.hydro_ds_base_url + '/api/dataservice'
         self._irods_rest_base_url = 'http://hydro-ds.uwrl.usu.edu:8080/irods-rest-4.0.2.1-SNAPSHOT/rest'
         self._hg_token_url = self._hydrogate_base_url + '/request_token/'
         self._hg_upload_pkg_url = self._hydrogate_base_url + '/upload_package/'
@@ -77,6 +78,10 @@ class HydroDS(object):
 
         _ServiceLog.load()
 
+    @property
+    def hydro_ds_base_url(self):
+        return 'http://hydro-ds.uwrl.usu.edu'
+
     def check_irods_server_status(self):
         url = '/server'
         response = self._make_irods_rest_call(url)
@@ -96,11 +101,15 @@ class HydroDS(object):
         url = self._irods_rest_base_url + url
         headers = {'content-type': 'application/json'}
         response_format = {'contentType': 'application/json'}
+        response = None
         try:
             response = self._requests.get(url, params=response_format, headers=headers, auth=(self._irods_username,
-                                                                                             self._irods_password))
+                                                                                              self._irods_password))
         except Exception as ex:
-           raise Exception("iRODS error." + response.reason + " " + response.content)
+            if response:
+                raise Exception("iRODS error." + response.reason + " " + response.content)
+            else:
+                raise Exception("iRODS error." + ex.message)
 
         return response
 
@@ -263,7 +272,7 @@ class HydroDS(object):
     def get_most_recent_request(self, service_name=None, service_id_name=None, service_id_value=None):
         return _ServiceLog.get_most_recent_request(service_name, service_id_name, service_id_value)
 
-    def upload_package(self, package_file_url_path):
+    def upload_package(self, package_file_url_path, wait_until_done=False):
         self._check_user_hpc_authentication()
 
         if not self._hg_token:
@@ -277,7 +286,7 @@ class HydroDS(object):
         response = self._requests.post(self._hg_upload_pkg_url, data=request_data, verify=False)
 
         if response.status_code != requests.codes.ok:
-            raise Exception("Hydrogate connection error.")
+            raise Exception("Hydrogate error. " + response.reason + " " + response.content)
 
         response_dict = json.loads(response.content)
 
@@ -287,7 +296,17 @@ class HydroDS(object):
                                          service_id_value=package_id, service_status='success')
             _ServiceLog.add(service_req)
             self.save_service_call_history()
-            return service_req
+            if wait_until_done:
+                # now check upload status
+                upload_status_request = self.get_upload_status()
+                while upload_status_request.service_status != "PackageTransferDone":
+                    if upload_status_request.service_status == "UploadError":
+                        return service_req, 'Upload error'
+                    time.sleep(10)
+                    upload_status_request = self.get_upload_status()
+
+                return service_req, 'success'
+            return service_req, None
         else:
             raise Exception('Hydrogate error: package uploading failed:%s' % response_dict['description'])
 
@@ -322,7 +341,7 @@ class HydroDS(object):
         else:
             raise Exception('Hydrogate error:' + response_dict['description'])
 
-    def submit_job(self, package_id, program_name, input_raster_file_name=None, **kwargs):
+    def submit_job(self, package_id, program_name, input_raster_file_name=None, wait_until_done=False, **kwargs):
        # TODO: check that the user provided program_name is one of the supported programs using the get_available_programs()
         self._check_user_hpc_authentication()
 
@@ -340,20 +359,18 @@ class HydroDS(object):
                 job_def['walltime'] = '00:00:50'
                 job_def['outputlist'] = ['fel*.tif']
                 job_def['parameters'] = {'z': input_raster_file_name, 'fel': 'feloutput.tif'}
-            elif program_name == 'uebpar':
-                job_def['program'] = 'uebpar'
+            elif program_name == 'ueb':
+                job_def['program'] = 'ueb'
                 job_def['walltime'] = '00:59:50'
                 job_def['outputlist'] = ['SWE.nc', 'aggout.nc', 'SWIT.nc', 'SWISM.nc']
-                #job_def['parameters'] = {'wdir': './'}
-                #job_def['runner_param'] = "-wdir .hydrogate/data/ea132802-24fe-11e5-9d14-0050569b33c6/JOB_91/LiitleBear1000"
-                job_def['parameters'] = {'wdir': './' , 'control': 'control.dat'}
+                job_def['parameters'] = {}
             else:
-                raise Exception("Program parameters are missing for '%s'." % program_name)
+                raise Exception("Program {program_name} is not supported.".format(program_name=program_name))
 
         request_data = {'token': self._hg_token, 'packageid': int(package_id), 'jobdefinition': json.dumps(job_def)}
         response = self._requests.post(self._hg_submit_job_url, data=request_data, verify=False)
         if response.status_code != requests.codes.ok:
-            raise Exception("Hydrogate connection error.")
+            raise Exception("Hydrogate error. " + response.reason + " " + response.content)
 
         response_dict = json.loads(response.content)
         if response_dict['status'] == 'success':
@@ -363,11 +380,21 @@ class HydroDS(object):
                                          service_id_value=job_id, service_status='success', file_path=output_file_path)
             _ServiceLog.add(service_req)
             self.save_service_call_history()
-            return service_req
+            if wait_until_done:
+                job_status = self.get_job_status(job_id=job_id)
+                while job_status != 'JobOutputFileTransferDone':
+                    if job_status == 'JobError':
+                        return service_req, 'Run job error'
+                    time.sleep(20)
+                    job_status = self.get_job_status(job_id=job_id)
+
+                return service_req, 'success'
+            return service_req, None
         else:
             raise Exception('Hydrogate error:%s' % response_dict['description'])
 
     def get_job_status(self, job_id):
+        # TODO: add docstring for this method
         self._check_user_hpc_authentication()
 
         if self._get_token_expire_time() == 0:
@@ -2272,6 +2299,19 @@ class HydroDS(object):
                 if not block:
                     break
                 file_obj.write(block)
+
+    def get_hydrogate_result_file(self, hg_file_url_path, save_as):
+        result_file_name = hg_file_url_path.split('/')[-1]
+        if not result_file_name.endswith('.zip'):
+            raise HydroDSArgumentException("Invalid value for parameter hg_file_url_path. File name must end with .zip")
+
+        if not save_as.endswith('.zip'):
+            raise  HydroDSArgumentException("Invalid value for parameter save_as. File name must end with .zip")
+
+        url = self._get_dataservice_specific_url('hydrogate/resultfile')
+        payload = {"result_file_name": result_file_name, 'save_as_file_name': save_as}
+        response = self._make_data_service_request(url, params=payload)
+        return self._process_dataservice_response(response, save_as=None)
 
     def set_hydroshare_account(self, username, password):
         self._hydroshare_auth = (username, password)
