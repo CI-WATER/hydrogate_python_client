@@ -17,11 +17,17 @@ try:
     # param: title: is optional
     # param: abstract: is optional
     # param: keywords: is optional
+    # param: metadata: is optional
+    metadata = []
+    metadata.append({'creator': {'name': 'Pabitra Dash', 'email': 'pabitra.dash@usu.edu'}})
+    metadata.append({'contributor': {'name': 'John Smith', 'email': 'jsmith@gmail.com'}})
+    metadata.append({'contributor': {'name': 'Lisa Anderson', 'email': 'landerson@gmail.com'}})
     response_data = hds.create_hydroshare_resource(file_name=file_to_use_for_hydroshare_resource,
                                                    resource_type='GenericResource',
-                                                   title='Topnet streamflow data from HydroDS testing kewords',
+                                                   title='Topnet streamflow data from HydroDS',
                                                    abstract="Testing creation resource from HydroDS",
-                                                   keywords=['HydroShare', 'HydroDS', 'TOPNET'])
+                                                   keywords=['HydroShare', 'HydroDS', 'TOPNET'],
+                                                   metadata=metadata)
     print(response_data)
 except Exception as ex:
     print(ex.message)

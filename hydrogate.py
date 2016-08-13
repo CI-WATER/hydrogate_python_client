@@ -2316,7 +2316,8 @@ class HydroDS(object):
     def set_hydroshare_account(self, username, password):
         self._hydroshare_auth = (username, password)
 
-    def create_hydroshare_resource(self, file_name, resource_type, title=None, abstract=None, keywords=None):
+    def create_hydroshare_resource(self, file_name, resource_type, title=None, abstract=None,
+                                   keywords=None, metadata=None):
         """
         Make a user file on HydroDS as a new resource in HydroShare
 
@@ -2330,6 +2331,8 @@ class HydroDS(object):
         :type abstract: string
         :param keywords: (optional) keywords for the new resource to be created in HydroShare
         :type keywords: list
+        :param metadata: (optional) metadata elements to be created for the new resource in HydroShare
+        :type metadata: list of dicts - each dict represents data for a given metadata element
         :return: a dictionary with keys ('resource_id', 'resource_type') that has value for resource id and resource
                  type of the HydroShare resource
 
@@ -2379,6 +2382,14 @@ class HydroDS(object):
             keywords = ','.join(keywords)
             payload['keywords'] = keywords
 
+        if metadata:
+            if not isinstance(metadata, list):
+                raise HydroDSArgumentException('metadata must be a list')
+            try:
+                metadata = json.dumps(metadata)
+                payload['metadata'] = metadata
+            except Exception as ex:
+                raise HydroDSArgumentException(ex.message)
         response = self._make_data_service_request(url, params=payload)
         return self._process_dataservice_response(response, save_as=None)
 
